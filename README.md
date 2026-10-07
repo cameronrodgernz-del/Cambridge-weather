@@ -22,6 +22,10 @@ A switch at the top moves between Cambridge and Tīeke Golf Estate (72 Lochiel R
 
 Each daylight hour scores out of 100 and loses points for rain (more for heavier rain), a high chance of showers, wind over 15 km/h, gusts over 30 km/h, a feels-like temperature under 15°C or over 28°C, fog and frost.
 
+## Mount Maunganui
+
+The third tab, with its own link `/mount`. The hourly chart swaps the fog and frost strip for the tide curve (LINZ predictions for Tauranga, bundled in `tides-tauranga.js` for 2026 and 2027) and a waves panel from the Open-Meteo marine model. An "At the beach" section gives the next tides, wave size and direction, the cleanest mornings for a surf (light or offshore winds, which at Main Beach come from the south round to the west), sea temperature, and tide and swell tables. The tide file needs a new year of LINZ predictions added before the end of 2027.
+
 ## Hosting
 
 It's a plain static site: `index.html`, `styles.css`, `app.js`. No build step and no keys. On Vercel, import the GitHub repository and deploy with the default settings (Framework preset: Other).

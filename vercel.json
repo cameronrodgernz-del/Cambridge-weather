@@ -4,6 +4,10 @@
     {
       "source": "/tieke",
       "destination": "/"
+    },
+    {
+      "source": "/mount",
+      "destination": "/"
     }
   ],
   "headers": [

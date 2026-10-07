@@ -15,6 +15,11 @@
       lat: -37.8650, lon: 175.3479, path: "/tieke", golf: true,
       metservice: "https://www.metservice.com/towns-cities/locations/hamilton", metserviceName: "Hamilton",
       site: "https://www.tiekegolf.co.nz/", phone: "07 843 6287"
+    },
+    mount: {
+      key: "mount", name: "Mount Maunganui", title: "Mount Maunganui Weather", region: "Bay of Plenty",
+      lat: -37.6330, lon: 176.1800, path: "/mount", coast: true,
+      metservice: "https://www.metservice.com/towns-cities/locations/mount-maunganui", metserviceName: "Mount Maunganui"
     }
   };
   const TIMEZONE = "Pacific/Auckland";
@@ -22,6 +27,7 @@
     let path = "", q = null;
     try { path = location.pathname.replace(/\/+$/, "").toLowerCase(); q = new URLSearchParams(location.search).get("place"); } catch (e) { /* no location */ }
     if (path.endsWith("/tieke") || q === "tieke") return PLACES.tieke;
+    if (path.endsWith("/mount") || q === "mount") return PLACES.mount;
     if (window.WX_PLACE && PLACES[window.WX_PLACE]) return PLACES[window.WX_PLACE];
     return PLACES.cambridge;
   }
@@ -54,7 +60,11 @@
     })),
     ens: "https://ensemble-api.open-meteo.com/v1/ensemble?" + qs(Object.assign({}, common, {
       forecast_days: 8, hourly: "precipitation", models: "ecmwf_ifs025"
-    }))
+    })),
+    marine: place.coast ? "https://marine-api.open-meteo.com/v1/marine?" + qs(Object.assign({}, common, {
+      forecast_days: 8,
+      hourly: "wave_height,wave_direction,wave_period,swell_wave_height,swell_wave_direction,swell_wave_period,sea_surface_temperature"
+    })) : null
   };
   }
 
@@ -180,7 +190,7 @@
   }
 
   /* ---------- build the working model from the three responses ---------- */
-  function build(main, models, ens) {
+  function build(main, models, ens, marine) {
     const h = main.hourly;
     const pick = (k, i) => (h[k] ? h[k][i] : null);
     const H = h.time.map((t, i) => ({
@@ -195,11 +205,25 @@
     H.forEach(x => {
       const spread = x.dew != null ? x.temp - x.dew : 99;
       const darkish = x.hr >= 20 || x.hr <= 10;
-      x.fog = darkish && x.mm < 0.2 && ((x.vis != null && x.vis <= 1000) || (spread <= 1.0 && (x.wind == null ? 99 : x.wind) <= 7));
+      // inland valleys fog on calm, near-saturated nights; on the coast the air sits near saturation most nights, so rely on the models' visibility
+      x.fog = darkish && x.mm < 0.2 && ((x.vis != null && x.vis <= 1000) || (!PLACE.coast && spread <= 1.0 && (x.wind == null ? 99 : x.wind) <= 7));
       x.frost = x.temp <= 1 || (x.temp <= 3.5 && (x.cloud == null ? 100 : x.cloud) <= 40 && (x.wind == null ? 99 : x.wind) <= 8);
     });
 
     H.forEach(x => { x.play = playScore(x); });
+    if (marine && marine.hourly) {
+      const m = marine.hourly, at = {};
+      m.time.forEach((t, i) => { at[t] = i; });
+      const g = (k, i) => (m[k] ? m[k][i] : null);
+      H.forEach(x => {
+        const i = at[x.t];
+        if (i == null) return;
+        x.wave = g("wave_height", i); x.waveDir = g("wave_direction", i); x.wavePer = g("wave_period", i);
+        x.swell = g("swell_wave_height", i); x.swellDir = g("swell_wave_direction", i); x.swellPer = g("swell_wave_period", i);
+        x.sst = g("sea_surface_temperature", i);
+      });
+    }
+    if (PLACE.coast) H.forEach(x => { x.tide = tideAt(x.n); });
 
     const cur = main.current;
     const nowN = tnum(cur.time);
@@ -274,7 +298,7 @@
       return dd;
     });
     const ti = Math.max(0, days.findIndex(d => d.date === todayDate));
-    return { place: PLACE.key, H, days, ti, cur, nowN, nowIdx, todayDate, hasModels: !!(models && models.daily), hasEns: !!(ens && ens.hourly) };
+    return { place: PLACE.key, H, days, ti, cur, nowN, nowIdx, todayDate, hasModels: !!(models && models.daily), hasEns: !!(ens && ens.hourly), hasMarine: !!(marine && marine.hourly) };
   }
 
   /* ---------- writing ---------- */
@@ -570,9 +594,18 @@
       { key: "temp", title: "Temperature °C", h: 130, min: tLo, max: tHi, ticks: tTicks },
       { key: "rain", title: "Chance of rain %", h: 78, min: 0, max: 100, ticks: [0, 50, 100] },
       { key: "wind", title: "Wind and gusts km/h", h: 104, min: 0, max: wHi, ticks: wTicks },
-      { key: "cloud", title: "Cloud cover %", h: 66, min: 0, max: 100, ticks: [0, 50, 100] },
-      { key: "strip", title: "Fog and frost risk", h: 16, min: 0, max: 1, ticks: [] }
+      { key: "cloud", title: "Cloud cover %", h: 66, min: 0, max: 100, ticks: [0, 50, 100] }
     ];
+    if (PLACE.coast) {
+      panels.push({ key: "tide", title: "Tide m (Tauranga)", h: 84, min: -0.35, max: 2.45, ticks: [0, 1, 2] });
+      const wMaxM = maxOf(rows.map(r => r.wave)) || 1;
+      const wTop = Math.max(1.5, Math.ceil((wMaxM + 0.3) * 2) / 2);
+      const step = wTop > 2.5 ? 1 : 0.5;
+      const wt = []; for (let v = 0; v <= wTop + 1e-9; v += step) wt.push(+v.toFixed(1));
+      if (S.hasMarine) panels.push({ key: "waves", title: "Waves m", h: 70, min: 0, max: wTop, ticks: wt });
+    } else {
+      panels.push({ key: "strip", title: "Fog and frost risk", h: 16, min: 0, max: 1, ticks: [] });
+    }
     const GAP = 30;
     let y = TOP + 40;
     panels.forEach(p => { p.y0 = y; y += p.h; p.y1 = y; y += GAP; });
@@ -615,7 +648,8 @@
         txt(String(t), { x: L - 6, y: sy(p, t) + 3.5, "text-anchor": "end" });
       });
     });
-    const [pT, pR, pW, pC, pS] = panels;
+    const [pT, pR, pW, pC] = panels;
+    const pS = panels.find(p => p.key === "strip"), pTide = panels.find(p => p.key === "tide"), pWave = panels.find(p => p.key === "waves");
     const path = (p, f) => rows.filter(r => f(r) != null).map((r, i) => (i ? "L" : "M") + xr(r).toFixed(1) + " " + sy(p, f(r)).toFixed(1)).join(" ");
 
     // temperature and dew point
@@ -664,12 +698,40 @@
     }
 
     // fog and frost strip
-    el("rect", { x: L, y: pS.y0, width: W - L - R, height: pS.h, class: "stripbg" });
-    rows.forEach((r, k) => {
-      if (k === rows.length - 1) return;
-      if (r.fog) el("rect", { x: xr(r), y: pS.y0, width: pxh, height: pS.h, class: "fog" });
-      if (r.frost) el("rect", { x: xr(r), y: pS.y0, width: pxh, height: pS.h, class: "frost" });
-    });
+    if (pS) {
+      el("rect", { x: L, y: pS.y0, width: W - L - R, height: pS.h, class: "stripbg" });
+      rows.forEach((r, k) => {
+        if (k === rows.length - 1) return;
+        if (r.fog) el("rect", { x: xr(r), y: pS.y0, width: pxh, height: pS.h, class: "fog" });
+        if (r.frost) el("rect", { x: xr(r), y: pS.y0, width: pxh, height: pS.h, class: "frost" });
+      });
+    }
+
+    // tide, from the LINZ predictions
+    if (pTide) {
+      const pts = [];
+      for (let k = 0; k <= N * 3; k++) { const v = tideAt(t0 + k / 3); if (v != null) pts.push([x(k / 3), sy(pTide, v)]); }
+      if (pts.length) {
+        const d = "M" + pts.map(q => q[0].toFixed(1) + " " + q[1].toFixed(1)).join(" L");
+        el("path", { d: d + " L" + pts[pts.length - 1][0].toFixed(1) + " " + pTide.y1 + " L" + pts[0][0].toFixed(1) + " " + pTide.y1 + " Z", class: "tidefill" });
+        el("path", { d, class: "tideline" });
+      }
+      tidesBetween(t0, t0 + N).forEach(e => {
+        const cx = x(e.n - t0), cy = sy(pTide, e.h), hi = e.h > 1;
+        el("circle", { cx, cy, r: 3.5, class: "tidept" });
+        txt(fmtClock(e.t), { x: Math.min(Math.max(cx, L + 22), W - R - 22), y: hi ? cy - 8 : cy + 15, "text-anchor": "middle" });
+      });
+    }
+
+    // waves
+    if (pWave) {
+      const wl = path(pWave, r => r.wave);
+      if (wl) {
+        el("path", { d: wl + " L" + x(N) + " " + pWave.y1 + " L" + x(0) + " " + pWave.y1 + " Z", class: "wavefill" });
+        el("path", { d: wl, class: "waveline" });
+      }
+      rows.forEach(r => { if (r.hr % dStep === 0 && r !== rows[rows.length - 1] && xr(r) > L + 12 && r.waveDir != null) txt(dir16(r.waveDir), { x: xr(r), y: pWave.y0 + 10, "text-anchor": "middle" }); });
+    }
 
     // hour labels
     const hStep = pxh * 3 >= 40 ? 3 : pxh * 6 >= 40 ? 6 : 12;
@@ -678,7 +740,7 @@
     // now
     const nowX = x(Math.max(0, S.nowN - t0));
     panels.forEach(p => el("line", { x1: nowX, x2: nowX, y1: p.y0, y2: p.y1, class: "now" }));
-    txt("now", { x: nowX + 4, y: pT.y0 + 10, class: "nowlbl" });
+    txt("now", { x: nowX + 4, y: pT.y1 - 5, class: "nowlbl" });
 
     const cross = el("line", { x1: 0, x2: 0, y1: TOP, y2: HGT - 18, class: "cross", visibility: "hidden" });
     const hit = el("rect", { x: L, y: TOP, width: W - L - R, height: HGT - TOP, class: "hit" });
@@ -896,6 +958,109 @@
     teeTip.style.left = left + "px"; teeTip.style.top = top + "px";
   }
 
+
+  /* ---------- beach ---------- */
+  const TIDE_N = (window.TIDES_TAURANGA || []).map(e => ({ t: e[0], n: tnum(e[0]), h: e[1] }));
+  function tideAt(n) {
+    let lo = 0, hi = TIDE_N.length - 1;
+    if (hi < 1 || n < TIDE_N[0].n || n > TIDE_N[hi].n) return null;
+    while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (TIDE_N[mid].n <= n) lo = mid; else hi = mid; }
+    const a = TIDE_N[lo], b = TIDE_N[hi];
+    const f = (n - a.n) / (b.n - a.n);
+    return a.h + (b.h - a.h) * (1 - Math.cos(Math.PI * f)) / 2;
+  }
+  function tidesBetween(n0, n1) { return TIDE_N.filter(e => e.n >= n0 && e.n <= n1); }
+  // Main Beach faces north-east, so winds from the south round to the west blow offshore.
+  const offshore = d => d != null && d >= 170 && d <= 280;
+  const onshore = d => d != null && (d <= 120 || d >= 330);
+  const DIRNOUN = ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"];
+  const dirNoun = d => d == null ? "" : DIRNOUN[Math.floor(((d + 22.5) % 360) / 45)];
+  function meanAngle(rows, key, wkey) {
+    let a = 0, b = 0;
+    rows.forEach(r => { if (r[key] == null) return; const w = wkey ? (r[wkey] || 0.1) : 1, t = r[key] * Math.PI / 180; a += w * Math.sin(t); b += w * Math.cos(t); });
+    if (!a && !b) return null;
+    return (Math.atan2(a, b) * 180 / Math.PI + 360) % 360;
+  }
+  const m1 = v => (Math.round(v * 10) / 10).toFixed(1);
+  const dayTag = (S, date) => date === S.todayDate ? "" : date === (S.days[S.ti + 1] || {}).date ? " tomorrow" : " on " + wd(date);
+  function morningWind(d) {
+    const rs = d.hrs.filter(x => x.hr >= 6 && x.hr <= 10);
+    if (!rs.length) return null;
+    const w = avg(rs.map(x => x.wind)), dir = meanDir(rs);
+    const clean = rs.filter(x => (x.wind || 0) < 8 || offshore(x.dir)).length >= rs.length - 1;
+    return { w, dir, clean, off: offshore(dir) && w >= 5, light: w < 8 };
+  }
+
+  function writeBeach(S) {
+    const out = [];
+    const nx = tidesBetween(S.nowN, S.nowN + 30).slice(0, 2);
+    if (nx.length === 2) {
+      const kind = e => e.h > 1 ? "high" : "low";
+      out.push("The next " + kind(nx[0]) + " tide is at " + fmtClock(nx[0].t) + dayTag(S, nx[0].t.slice(0, 10)) + ", then " + kind(nx[1]) + " tide at " + fmtClock(nx[1].t) + dayTag(S, nx[1].t.slice(0, 10)) + ".");
+    }
+    if (S.hasMarine) {
+      const day = (d, fromN) => d.hrs.filter(x => x.hr >= 8 && x.hr <= 18 && x.wave != null && (fromN == null || x.n >= fromN));
+      let todayRows = day(S.days[S.ti], S.nowN - 1);
+      if (!todayRows.length) todayRows = day(S.days[S.ti]);
+      if (todayRows.length) {
+        const m = avg(todayRows.map(x => x.wave)), dir = meanAngle(todayRows, "waveDir"), per = avg(todayRows.map(x => x.wavePer));
+        let line = "Waves are around " + m1(m) + " m from the " + dirNoun(dir) + " today" + (per ? ", " + r0(per) + " seconds apart" : "");
+        const ahead = S.days.slice(S.ti + 1, S.ti + 4).map(d => ({ d, m: avg(day(d).map(x => x.wave)) })).filter(o => o.m != null);
+        if (ahead.length) {
+          const up = ahead.slice().sort((a, b) => b.m - a.m)[0], dn = ahead.slice().sort((a, b) => a.m - b.m)[0];
+          if (up.m >= m + 0.3) line += ", building to " + m1(up.m) + " m on " + up.d.name;
+          else if (dn.m <= m - 0.2) line += ", easing to " + m1(dn.m) + " m by " + dn.d.name;
+          else line += ", and staying much the same for the next few days";
+        }
+        out.push(line + ".");
+      }
+    }
+    const hrNow = +S.cur.time.slice(11, 13);
+    const span = S.days.slice(hrNow < 9 ? S.ti : S.ti + 1, S.ti + 4);
+    const clean = span.filter(d => { const mw = morningWind(d); return mw && mw.clean; });
+    if (clean.length) {
+      const names = clean.map(d => d.i === S.ti ? "today" : d.i === S.ti + 1 ? "tomorrow" : d.name);
+      const breeze = clean.filter(d => { const rs = d.hrs.filter(x => x.hr >= 12 && x.hr <= 17); return rs.length && onshore(meanDir(rs)) && avg(rs.map(x => x.wind)) >= 10; }).length >= Math.ceil(clean.length / 2);
+      out.push("Mornings look cleanest " + (names.length === 1 && (names[0] === "today" || names[0] === "tomorrow") ? names[0] : "on " + listJoin(names)) + ", with light or offshore winds" + (breeze ? " before an onshore breeze picks up in the afternoon" : "") + ".");
+    } else if (span.length) {
+      out.push("Onshore winds look like keeping the water choppy for the next few days.");
+    }
+    const sst = avg(S.H.filter(x => x.date === S.todayDate).map(x => x.sst));
+    if (sst != null) out.push("The sea is about " + r0(sst) + "°C" + (sst < 18 ? ", so it's wetsuit weather" : "") + ".");
+    return out;
+  }
+
+  function renderBeach() {
+    const lines = writeBeach(S);
+    $("beachRead").innerHTML = lines.length ? '<p class="lead">' + esc(lines[0]) + "</p>" + (lines.length > 1 ? "<p>" + esc(lines.slice(1).join(" ")) + "</p>" : "") : "";
+    const days = S.days.slice(S.ti, S.ti + 4);
+    const label = d => d.i === S.ti ? "Today" : d.name.slice(0, 3) + " " + dnum(d.date);
+    const tideRows = days.map(d => {
+      const es = TIDE_N.filter(e => e.t.slice(0, 10) === d.date);
+      const cells = es.map(e => '<td class="' + (e.h > 1 ? "hl" : "") + '">' + (e.h > 1 ? "High " : "Low ") + fmtClock(e.t) + " <small>" + e.h.toFixed(1) + "</small></td>");
+      while (cells.length < 4) cells.push("<td></td>");
+      return '<tr><td class="part">' + label(d) + "</td>" + cells.join("") + "</tr>";
+    }).join("");
+    const seaDays = S.days.slice(S.ti, S.ti + 5);
+    const seaRows = seaDays.map(d => {
+      const rs = d.hrs.filter(x => x.hr >= 8 && x.hr <= 18 && x.wave != null);
+      const mw = morningWind(d);
+      const mwTxt = mw ? (mw.light ? "Light" : dir16(mw.dir) + " " + r0(mw.w) + " km/h") + (mw.off ? ", offshore" : mw.light ? "" : onshore(mw.dir) ? ", onshore" : ", cross-shore") : "–";
+      if (!rs.length) return '<tr><td class="part">' + label(d) + '</td><td class="n">–</td><td class="n">–</td><td>–</td><td class="n">–</td><td>' + esc(mwTxt) + "</td></tr>";
+      const lo = minOf(rs.map(x => x.wave)), hi = maxOf(rs.map(x => x.wave));
+      const sst = avg(d.hrs.map(x => x.sst));
+      return '<tr><td class="part">' + label(d) + '</td><td class="n">' + (m1(lo) === m1(hi) ? m1(hi) : m1(lo) + "–" + m1(hi)) + ' m</td><td class="n">' + r0(avg(rs.map(x => x.wavePer)) || 0) + " s</td><td>" + cap(dirNoun(meanAngle(rs, "waveDir"))) + '</td><td class="n">' + (sst != null ? r0(sst) + "°" : "–") + "</td><td>" + esc(mwTxt) + "</td></tr>";
+    }).join("");
+    $("beachDetail").innerHTML =
+      '<div class="col"><h3>Tides</h3><div class="tablewrap"><table class="tides"><thead><tr><th></th><th colspan="4">In order through the day, height in metres</th></tr></thead><tbody>' + tideRows + "</tbody></table></div>" +
+      '<p class="small">LINZ predictions for Tauranga, the standard port at the harbour entrance beside Mauao. Heights are above chart datum.</p></div>' +
+      '<div class="col"><h3>Swell and sea</h3>' + (S.hasMarine
+        ? '<div class="tablewrap"><table><thead><tr><th></th><th class="n">Waves</th><th class="n">Period</th><th>From</th><th class="n">Sea</th><th>Wind 6–10am</th></tr></thead><tbody>' + seaRows + "</tbody></table></div>" +
+          '<p class="small">Waves are for daylight hours from the marine model just offshore. At Main Beach, winds from the south round to the west blow offshore.</p>'
+        : '<p class="small">The swell forecast didn\'t load this time. Refresh the page to try again.</p>') +
+      '<p class="small">On Mauao the summit sits 232 m above the base track, so expect it to be a degree or two cooler and breezier at the top.</p></div>';
+  }
+
   function hideTip() { tip.hidden = true; if (geo) geo.cross.setAttribute("visibility", "hidden"); }
 
   function move(ev) {
@@ -917,7 +1082,9 @@
       (d.gust != null ? row("Gusts", r0(d.gust) + " km/h") : "") +
       (d.cloud != null ? row("Cloud", d.cloud + "%") : "") +
       (d.rh != null ? row("Humidity", d.rh + "%") : "") +
-      (d.isDay && d.uv != null ? row("UV", d.uv.toFixed(1)) : "");
+      (d.isDay && d.uv != null ? row("UV", d.uv.toFixed(1)) : "") +
+      (d.tide != null ? row("Tide", d.tide.toFixed(1) + " m") : "") +
+      (d.wave != null ? row("Waves", d.wave.toFixed(1) + " m, " + (d.wavePer != null ? r0(d.wavePer) + " s" : "") + (d.waveDir != null ? " from " + dir16(d.waveDir) : "")) : "");
     if (d.fog) html += '<div class="flag">Fog risk</div>';
     if (d.frost) html += '<div class="flag">Frost risk</div>';
     tip.innerHTML = html;
@@ -950,6 +1117,8 @@
     document.title = PLACE.title;
     $("chart").setAttribute("aria-label", "Hourly temperature, chance of rain, wind and cloud for " + PLACE.name);
     $("golfsec").hidden = !PLACE.golf;
+    $("beachsec").hidden = !PLACE.coast;
+    document.body.classList.toggle("coast", !!PLACE.coast);
     document.querySelectorAll("#placeSeg button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.place === PLACE.key)));
   }
 
@@ -960,6 +1129,7 @@
     renderNow();
     renderRead();
     if (PLACE.golf) renderGolf();
+    if (PLACE.coast) renderBeach();
     renderLedger();
     renderChart();
     renderDay();
@@ -991,22 +1161,23 @@
   async function load() {
     const my = ++seq, place = PLACE;
     try {
-      let main, models, ens;
+      let main, models, ens, marine;
       if (window.WX_SNAPSHOT) {
         snapshotMode = true;
         const snap = window.WX_SNAPSHOT[place.key] || (window.WX_SNAPSHOT.main ? window.WX_SNAPSHOT : null);
         if (!snap) throw new Error("this preview has no data for " + place.name);
-        ({ main, models, ens } = snap);
+        ({ main, models, ens, marine } = snap);
       } else {
         const U = urlsFor(place);
-        const res = await Promise.allSettled([getJSON(U.main, 3), getJSON(U.models), getJSON(U.ens)]);
+        const res = await Promise.allSettled([getJSON(U.main, 3), getJSON(U.models), getJSON(U.ens), U.marine ? getJSON(U.marine) : Promise.resolve(null)]);
         if (res[0].status !== "fulfilled") throw res[0].reason || new Error("No data");
         main = res[0].value;
         models = res[1].status === "fulfilled" ? res[1].value : null;
         ens = res[2].status === "fulfilled" ? res[2].value : null;
+        marine = res[3].status === "fulfilled" ? res[3].value : null;
       }
       if (my !== seq || place !== PLACE) return;
-      S = build(main, models, ens);
+      S = build(main, models, ens, marine);
       renderAll();
       lastLoad = Date.now();
     } catch (e) {
