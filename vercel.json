@@ -3,7 +3,7 @@
   "rewrites": [
     {
       "source": "/tieke",
-      "destination": "/index.html"
+      "destination": "/"
     }
   ],
   "headers": [
