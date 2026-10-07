@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en-NZ">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cambridge Weather</title>
+<meta name="description" content="Hour-by-hour weather for Cambridge, Waikato: temperature, rain, wind, cloud, fog and frost, with a plain-English read and a check on how far the weather models agree.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=IBM+Plex+Mono:wght@400;500&family=Public+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="i-sun" viewBox="0 0 48 48">
+      <circle cx="24" cy="24" r="9" class="s-sun"/>
+      <g class="s-ray" stroke-width="2.4" stroke-linecap="round" fill="none">
+        <line x1="24" y1="5" x2="24" y2="10"/><line x1="24" y1="38" x2="24" y2="43"/>
+        <line x1="5" y1="24" x2="10" y2="24"/><line x1="38" y1="24" x2="43" y2="24"/>
+        <line x1="10.6" y1="10.6" x2="14.1" y2="14.1"/><line x1="33.9" y1="33.9" x2="37.4" y2="37.4"/>
+        <line x1="10.6" y1="37.4" x2="14.1" y2="33.9"/><line x1="33.9" y1="14.1" x2="37.4" y2="10.6"/>
+      </g>
+    </symbol>
+    <symbol id="i-suncloud" viewBox="0 0 48 48">
+      <circle cx="18" cy="17" r="7.5" class="s-sun"/>
+      <g class="s-ray" stroke-width="2.2" stroke-linecap="round" fill="none">
+        <line x1="18" y1="3" x2="18" y2="6.5"/><line x1="4" y1="17" x2="7.5" y2="17"/>
+        <line x1="8.1" y1="7.1" x2="10.6" y2="9.6"/><line x1="27.9" y1="7.1" x2="25.4" y2="9.6"/>
+      </g>
+      <path d="M15 40h20a7.5 7.5 0 0 0 0-15 10 10 0 0 0-19.2 3.4A5.8 5.8 0 0 0 15 40z" class="s-cloud" stroke-width="2" stroke-linejoin="round"/>
+    </symbol>
+    <symbol id="i-cloud" viewBox="0 0 48 48">
+      <path d="M11 37h24a8.5 8.5 0 0 0 0-17 11.5 11.5 0 0 0-22 3.8A6.6 6.6 0 0 0 11 37z" class="s-cloud" stroke-width="2" stroke-linejoin="round"/>
+    </symbol>
+    <symbol id="i-showers" viewBox="0 0 48 48">
+      <circle cx="32" cy="13" r="6" class="s-sun"/>
+      <path d="M10 32h22a8 8 0 0 0 0-16 11 11 0 0 0-21 3.6A6.3 6.3 0 0 0 10 32z" class="s-cloud" stroke-width="2" stroke-linejoin="round"/>
+      <g class="s-drop" stroke-width="2.4" stroke-linecap="round">
+        <line x1="17" y1="37" x2="15.5" y2="42"/><line x1="26" y1="37" x2="24.5" y2="42"/>
+      </g>
+    </symbol>
+    <symbol id="i-rain" viewBox="0 0 48 48">
+      <path d="M11 30h23a8 8 0 0 0 0-16 11 11 0 0 0-21 3.6A6.3 6.3 0 0 0 11 30z" class="s-cloud" stroke-width="2" stroke-linejoin="round"/>
+      <g class="s-drop" stroke-width="2.4" stroke-linecap="round">
+        <line x1="16" y1="35" x2="14" y2="41"/><line x1="24" y1="35" x2="22" y2="41"/><line x1="32" y1="35" x2="30" y2="41"/>
+      </g>
+    </symbol>
+    <symbol id="i-moon" viewBox="0 0 48 48">
+      <path d="M30 8a16 16 0 1 0 10 28A14 14 0 0 1 30 8z" class="s-moon" stroke-width="2" stroke-linejoin="round"/>
+    </symbol>
+    <pattern id="p-fog" width="6" height="6" patternUnits="userSpaceOnUse">
+      <circle cx="1.5" cy="1.5" r="1.1" class="pat-fog"/><circle cx="4.5" cy="4.5" r="1.1" class="pat-fog"/>
+    </pattern>
+    <pattern id="p-frost" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <line x1="0" y1="0" x2="0" y2="6" class="pat-frost" stroke-width="2.2"/>
+    </pattern>
+  </defs>
+</svg>
+
+<div class="wrap">
+
+  <header class="top">
+    <div class="place">
+      <span class="eyebrow" id="region">Waikato, New Zealand</span>
+      <h1 id="placeName">Cambridge</h1>
+      <span class="stamp" id="stamp">Loading the latest forecast</span>
+    </div>
+    <div class="now" id="now" aria-live="polite"></div>
+  </header>
+
+  <section class="read" aria-label="Summary">
+    <div id="read" class="readtext"><p class="muted">Loading the latest forecast for Cambridge.</p></div>
+  </section>
+
+  <section aria-labelledby="h-week">
+    <div class="sechead"><h2 id="h-week">The next seven days</h2><p>Tap a day for the detail.</p></div>
+    <div class="ledger-scroll"><div class="ledger" id="ledger" role="list"></div></div>
+  </section>
+
+  <section aria-labelledby="h-hours">
+    <div class="sechead row">
+      <div><h2 id="h-hours">Hour by hour</h2><p>Shaded bands are night. Hover or tap the chart for the readings at any hour.</p></div>
+      <div class="seg" role="group" aria-label="Chart range">
+        <button type="button" id="r48" data-range="48">48 hours</button>
+        <button type="button" id="r96" data-range="96" aria-pressed="true">4 days</button>
+        <button type="button" id="r168" data-range="168">7 days</button>
+      </div>
+    </div>
+    <div class="chartbox" id="chartbox">
+      <div class="legend">
+        <span><i class="sw line" style="background:var(--temp)"></i>Temperature</span>
+        <span><i class="sw dash"></i>Dew point</span>
+        <span><i class="sw" style="background:var(--rain)"></i>Chance of rain</span>
+        <span><i class="sw line" style="background:var(--wind)"></i>Wind</span>
+        <span><i class="sw" style="background:var(--gust)"></i>Wind to gust range</span>
+        <span><i class="sw" style="background:var(--cloudfill);border:1px solid var(--cloud)"></i>Cloud cover</span>
+        <span><svg class="swp" viewBox="0 0 14 10" aria-hidden="true"><rect width="14" height="10" fill="url(#p-fog)"/></svg>Fog risk</span>
+        <span><svg class="swp" viewBox="0 0 14 10" aria-hidden="true"><rect width="14" height="10" fill="url(#p-frost)"/></svg>Frost risk</span>
+      </div>
+      <div class="chartscroll" id="chartscroll"><svg id="chart" role="img" aria-label="Hourly temperature, chance of rain, wind and cloud for Cambridge"></svg></div>
+      <div class="tip" id="tip" hidden></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-day" id="daysec">
+    <div class="sechead"><h2 id="h-day">Today in detail</h2></div>
+    <div class="daydetail" id="daydetail"></div>
+  </section>
+
+  <section aria-labelledby="h-models">
+    <div class="sechead"><h2 id="h-models">How firm the forecast is</h2><p>Rain each day from six independent weather models, and from the 51 runs of the European ensemble.</p></div>
+    <div class="agree">
+      <div class="col" id="agreeText"></div>
+      <div class="col"><div class="tablewrap"><table class="models" id="models"></table></div></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-past">
+    <div class="sechead"><h2 id="h-past">The past week</h2></div>
+    <div class="past" id="past"></div>
+  </section>
+
+  <footer>
+    <p id="dataNote">Forecast data from Open-Meteo, refreshed every time the page loads and every 30 minutes while it's open.</p>
+    <ul>
+      <li><a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0): blended hourly forecast, the ECMWF, UK Met Office, GFS, ICON, GEM and JMA models, and the 51-run ECMWF ensemble.</li>
+      <li>Official forecasts and any warnings: <a id="msLink" href="https://www.metservice.com/towns-cities/locations/cambridge" target="_blank" rel="noopener">MetService, Cambridge</a> and <a href="https://www.metservice.com/warnings/home" target="_blank" rel="noopener">MetService warnings</a>.</li>
+    </ul>
+  </footer>
+
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
