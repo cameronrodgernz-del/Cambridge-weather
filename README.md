@@ -11,13 +11,24 @@ Hour-by-hour weather for Cambridge, Waikato. The page pulls fresh model data fro
 - How firm the forecast is: rain each day from six weather models (ECMWF, UK Met Office, GFS, ICON, GEM, JMA) and the 51-run ECMWF ensemble
 - The past week's rain and temperatures
 
+## Tīeke Golf Estate
+
+A switch at the top moves between Cambridge and Tīeke Golf Estate (72 Lochiel Road, Tamahere). Tīeke has its own link, `/tieke`, its own forecast point on the river flats, and an extra golf section:
+
+- A written read of the best time to tee off today, tomorrow and later in the week
+- A tee sheet for the next seven days, one square per daylight hour, shaded from poor to great golf, with rain, likely showers, strong gusts, fog and frost marked, and the best four-hour window for 18 holes outlined
+- First light, last tee times for 18 and 9 holes, sunset and sunscreen hours for today and tomorrow
+- Rain over the last 48 hours and what that means underfoot, plus booking details
+
+Each daylight hour scores out of 100 and loses points for rain (more for heavier rain), a high chance of showers, wind over 15 km/h, gusts over 30 km/h, a feels-like temperature under 15°C or over 28°C, fog and frost.
+
 ## Hosting
 
 It's a plain static site: `index.html`, `styles.css`, `app.js`. No build step and no keys. On Vercel, import the GitHub repository and deploy with the default settings (Framework preset: Other).
 
 ## Making a copy for another town
 
-Change `PLACE` at the top of `app.js` (name, region, latitude, longitude and the MetService link), update the `<title>` in `index.html`, and deploy the copy as its own Vercel project.
+Add an entry to `PLACES` at the top of `app.js` (name, region, latitude, longitude, path and MetService link), add a button for it in the location switch in `index.html`, and add a rewrite for its path in `vercel.json`.
 
 ## Data
 

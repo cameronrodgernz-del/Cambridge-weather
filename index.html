@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Cambridge Weather</title>
 <meta name="description" content="Hour-by-hour weather for Cambridge, Waikato: temperature, rain, wind, cloud, fog and frost, with a plain-English read and a check on how far the weather models agree.">
-<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=IBM+Plex+Mono:wght@400;500&family=Public+Sans:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="/styles.css">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
@@ -63,6 +63,10 @@
 
   <header class="top">
     <div class="place">
+      <div class="seg placeseg" id="placeSeg" role="group" aria-label="Location">
+        <button type="button" data-place="cambridge" aria-pressed="true">Cambridge</button>
+        <button type="button" data-place="tieke" aria-pressed="false">T<span class="tk">ī</span>eke Golf Estate</button>
+      </div>
       <span class="eyebrow" id="region">Waikato, New Zealand</span>
       <h1 id="placeName">Cambridge</h1>
       <span class="stamp" id="stamp">Loading the latest forecast</span>
@@ -74,6 +78,25 @@
     <div id="read" class="readtext"><p class="muted">Loading the latest forecast for Cambridge.</p></div>
   </section>
 
+  <section id="golfsec" aria-labelledby="h-golf" hidden>
+    <div class="sechead"><h2 id="h-golf">On the course</h2><p>When to play over the next seven days, hour by hour from first light to last. Darker squares mean better golf. Hover or tap a square for the detail.</p></div>
+    <div id="golfRead" class="readtext"></div>
+    <div class="chartbox" id="teebox">
+      <div class="legend">
+        <span><svg class="swp ramp" viewBox="0 0 28 10" aria-hidden="true"><rect x="0" width="7" height="10" class="cell" fill-opacity="0.12"/><rect x="7" width="7" height="10" class="cell" fill-opacity="0.3"/><rect x="14" width="7" height="10" class="cell" fill-opacity="0.58"/><rect x="21" width="7" height="10" class="cell" fill-opacity="0.95"/></svg>Poor to great</span>
+        <span><svg class="swi" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="3.4" class="rdot"/></svg>Rain</span>
+        <span><svg class="swi" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="3" class="rring"/></svg>Shower likely</span>
+        <span><svg class="swi" viewBox="0 0 14 12" aria-hidden="true"><line x1="1" x2="13" y1="6" y2="6" class="gbar"/></svg>Gusts over 35 km/h</span>
+        <span><svg class="swp" viewBox="0 0 14 10" aria-hidden="true"><rect width="14" height="10" fill="url(#p-fog)"/></svg>Fog risk</span>
+        <span><svg class="swp" viewBox="0 0 14 10" aria-hidden="true"><rect width="14" height="10" fill="url(#p-frost)"/></svg>Frost risk</span>
+        <span><svg class="swi" viewBox="0 0 16 12" aria-hidden="true"><rect x="1" y="1" width="14" height="10" rx="2" class="bestbox"/></svg>Best time to start 18 holes</span>
+      </div>
+      <div class="chartscroll" id="teescroll"><svg id="tee" role="img" aria-label="Golf conditions by hour for the next seven days at Tīeke Golf Estate"></svg></div>
+      <div class="tip" id="teeTip" hidden></div>
+    </div>
+    <div class="golffacts" id="golfFacts"></div>
+  </section>
+
   <section aria-labelledby="h-week">
     <div class="sechead"><h2 id="h-week">The next seven days</h2><p>Tap a day for the detail.</p></div>
     <div class="ledger-scroll"><div class="ledger" id="ledger" role="list"></div></div>
@@ -82,7 +105,7 @@
   <section aria-labelledby="h-hours">
     <div class="sechead row">
       <div><h2 id="h-hours">Hour by hour</h2><p>Shaded bands are night. Hover or tap the chart for the readings at any hour.</p></div>
-      <div class="seg" role="group" aria-label="Chart range">
+      <div class="seg" id="rangeSeg" role="group" aria-label="Chart range">
         <button type="button" id="r48" data-range="48">48 hours</button>
         <button type="button" id="r96" data-range="96" aria-pressed="true">4 days</button>
         <button type="button" id="r168" data-range="168">7 days</button>
@@ -132,6 +155,6 @@
 
 </div>
 
-<script src="app.js"></script>
+<script src="/app.js"></script>
 </body>
 </html>

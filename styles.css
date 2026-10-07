@@ -46,7 +46,7 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--b
   padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
 .wrap { max-width: 1120px; margin: 0 auto; padding-inline: 20px; padding-block: 36px 64px; display: flex; flex-direction: column; gap: 52px; }
 h1, h2, h3 { font-family: var(--display); margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
-h1 { font-size: clamp(2.6rem, 7vw, 4.4rem); font-weight: 750; line-height: 0.95; font-variation-settings: "opsz" 96; }
+h1 { font-size: clamp(2.6rem, 7vw, 4.4rem); font-weight: 750; line-height: 0.95; font-variation-settings: "opsz" 96; font-kerning: none; }
 h2 { font-size: 1.6rem; font-weight: 700; line-height: 1.15; }
 h3 { font-size: 1.12rem; font-weight: 650; }
 p { margin: 0; }
@@ -125,6 +125,36 @@ section { display: flex; flex-direction: column; gap: 16px; }
   .day .tags { grid-area: tags; min-height: 0; }
   .day .tags:empty { display: none; }
 }
+
+/* location switch */
+.tk { margin-left: 0.08em; }
+.placeseg { align-self: flex-start; margin-bottom: 6px; }
+.placeseg button { padding: 8px 14px; font-size: 13.5px; font-kerning: none; }
+body.is-loading .wrap > section:not(.read), body.is-loading .now { opacity: 0.45; transition: opacity 0.2s; }
+
+/* golf */
+#golfsec .readtext { max-width: 72ch; }
+#tee { display: block; }
+#tee text { font-family: var(--mono); font-size: 10.5px; fill: var(--muted); }
+#tee .rl { font-family: var(--body); font-size: 12.5px; font-weight: 600; fill: var(--ink); }
+#tee .th { font-size: 10px; }
+#tee .dark { fill: var(--night); }
+#tee .cellbg { fill: var(--surface); }
+#tee .fog { fill: url(#p-fog); }
+#tee .frost { fill: url(#p-frost); }
+#tee .hit { fill: transparent; cursor: pointer; }
+.cell { fill: var(--accent); }
+.rdot { fill: var(--rain); stroke: var(--surface); stroke-width: 1.2; }
+.rring { fill: var(--surface); stroke: var(--rain); stroke-width: 1.6; }
+.gbar { stroke: var(--ink); stroke-width: 2; stroke-linecap: round; }
+.bestbox { fill: none; stroke: var(--ink); stroke-width: 2; }
+.swi { width: 14px; height: 12px; }
+.swp.ramp { width: 28px; }
+.golffacts { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 28px 48px; align-items: start; }
+.golffacts .col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.golffacts .col p { max-width: 60ch; }
+.golffacts td.n, .golffacts th.n { text-align: right; padding-left: 12px; padding-right: 0; }
+@media (max-width: 860px) { .golffacts { grid-template-columns: 1fr; } }
 
 /* range buttons */
 .seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; background: var(--surface); }

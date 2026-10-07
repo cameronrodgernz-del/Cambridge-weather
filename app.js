@@ -1,17 +1,31 @@
 /* Cambridge Weather
-   Everything is computed in the browser from Open-Meteo. To make a copy of this site for another town,
-   change PLACE below (name, region, coordinates and the MetService link) and redeploy. */
+   Everything is computed in the browser from Open-Meteo. Each place below gets its own forecast point.
+   To add a place, add an entry to PLACES (and a matching rewrite in vercel.json for its path). */
 (function () {
   "use strict";
 
-  const PLACE = {
-    name: "Cambridge",
-    region: "Waikato, New Zealand",
-    lat: -37.8833,
-    lon: 175.4667,
-    timezone: "Pacific/Auckland",
-    metservice: "https://www.metservice.com/towns-cities/locations/cambridge"
+  const PLACES = {
+    cambridge: {
+      key: "cambridge", name: "Cambridge", title: "Cambridge Weather", region: "Waikato, New Zealand",
+      lat: -37.8833, lon: 175.4667, path: "/",
+      metservice: "https://www.metservice.com/towns-cities/locations/cambridge", metserviceName: "Cambridge"
+    },
+    tieke: {
+      key: "tieke", name: "Tīeke Golf Estate", title: "Tīeke Golf Weather", region: "Tamahere, Waikato",
+      lat: -37.8650, lon: 175.3479, path: "/tieke", golf: true,
+      metservice: "https://www.metservice.com/towns-cities/locations/hamilton", metserviceName: "Hamilton",
+      site: "https://www.tiekegolf.co.nz/", phone: "07 843 6287"
+    }
   };
+  const TIMEZONE = "Pacific/Auckland";
+  function placeFromAddress() {
+    let path = "", q = null;
+    try { path = location.pathname.replace(/\/+$/, "").toLowerCase(); q = new URLSearchParams(location.search).get("place"); } catch (e) { /* no location */ }
+    if (path.endsWith("/tieke") || q === "tieke") return PLACES.tieke;
+    if (window.WX_PLACE && PLACES[window.WX_PLACE]) return PLACES[window.WX_PLACE];
+    return PLACES.cambridge;
+  }
+  let PLACE = placeFromAddress();
 
   const MODELS = [
     ["ecmwf_ifs025", "European (ECMWF)"],
@@ -25,8 +39,9 @@
 
   /* ---------- requests ---------- */
   const qs = o => Object.entries(o).map(([k, v]) => k + "=" + encodeURIComponent(v)).join("&");
-  const common = { latitude: PLACE.lat, longitude: PLACE.lon, timezone: PLACE.timezone };
-  const URLS = {
+  function urlsFor(place) {
+  const common = { latitude: place.lat, longitude: place.lon, timezone: TIMEZONE };
+  return {
     main: "https://api.open-meteo.com/v1/forecast?" + qs(Object.assign({}, common, {
       forecast_days: 8, past_days: 7, wind_speed_unit: "kmh",
       current: "temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m,wind_gusts_10m,is_day",
@@ -41,6 +56,7 @@
       forecast_days: 8, hourly: "precipitation", models: "ecmwf_ifs025"
     }))
   };
+  }
 
   async function getJSON(url, tries) {
     let last;
@@ -183,6 +199,8 @@
       x.frost = x.temp <= 1 || (x.temp <= 3.5 && (x.cloud == null ? 100 : x.cloud) <= 40 && (x.wind == null ? 99 : x.wind) <= 8);
     });
 
+    H.forEach(x => { x.play = playScore(x); });
+
     const cur = main.current;
     const nowN = tnum(cur.time);
     let nowIdx = H.findIndex(x => x.n > nowN) - 1;
@@ -256,7 +274,7 @@
       return dd;
     });
     const ti = Math.max(0, days.findIndex(d => d.date === todayDate));
-    return { H, days, ti, cur, nowN, nowIdx, todayDate, hasModels: !!(models && models.daily), hasEns: !!(ens && ens.hourly) };
+    return { place: PLACE.key, H, days, ti, cur, nowN, nowIdx, todayDate, hasModels: !!(models && models.daily), hasEns: !!(ens && ens.hourly) };
   }
 
   /* ---------- writing ---------- */
@@ -670,6 +688,214 @@
     hit.addEventListener("pointerleave", hideTip);
   }
 
+
+  /* ---------- golf ---------- */
+  // How good an hour is for a round, 0 to 100, with the reasons it loses points. Dark hours get null.
+  function playScore(x) {
+    if (!x.isDay) return null;
+    let s = 100;
+    const why = [];
+    const f = x.feels != null ? x.feels : x.temp;
+    if (x.mm >= 3) { s -= 80; why.push("heavy rain"); }
+    else if (x.mm >= 1) { s -= 65; why.push("rain"); }
+    else if (x.mm >= 0.2) { s -= 40; why.push("showers"); }
+    else if ((x.pop || 0) >= 60) { s -= 15; why.push("a chance of showers"); }
+    else if ((x.pop || 0) >= 40) s -= 6;
+    const w = x.wind || 0, g = x.gust || 0;
+    if (w > 15) s -= (w - 15) * 2;
+    if (g > 30) s -= (g - 30) * 1.2;
+    if (w > 20 || g > 40) why.push("wind");
+    if (f < 12) { s -= (12 - f) * 4; why.push("cold"); } else if (f < 15) s -= (15 - f) * 1.5;
+    if (f > 28) { s -= (f - 28) * 4; why.push("heat"); }
+    if (x.fog) { s -= 30; why.push("fog"); }
+    if (x.frost) { s -= 40; why.push("frost on the greens"); }
+    return { s: Math.max(0, Math.min(100, Math.round(s))), why };
+  }
+  const playWord = v => v >= 80 ? "great" : v >= 65 ? "good" : v >= 45 ? "fair" : "poor";
+
+  // Best run of `len` daylight hours in a day, optionally starting no earlier than fromN.
+  function bestWindow(d, len, fromN) {
+    const hrs = d.hrs.filter(x => x.play && (fromN == null || x.n >= fromN));
+    let best = null;
+    for (let i = 0; i + len <= hrs.length; i++) {
+      const w = hrs.slice(i, i + len);
+      if (w[len - 1].n - w[0].n !== len - 1) continue;
+      const sc = w.map(x => x.play.s);
+      const mean = sum(sc) / len, mn = Math.min.apply(null, sc);
+      const v = mean * 0.7 + mn * 0.3;
+      if (!best || v > best.v + 0.01) best = { v, hrs: w, start: w[0], end: w[len - 1] };
+    }
+    return best;
+  }
+  function windowCond(b) {
+    const mm = sum(b.hrs.map(x => x.mm));
+    const tMin = r0(minOf(b.hrs.map(x => x.temp))), tMax = r0(maxOf(b.hrs.map(x => x.temp)));
+    const wMin = r0(minOf(b.hrs.map(x => x.wind))), wMax = r0(maxOf(b.hrs.map(x => x.wind))), g = r0(maxOf(b.hrs.map(x => x.gust)));
+    const rain = mm < 0.2 ? "dry" : mm < 1 ? "a little light rain" : r0(mm) + " mm of rain";
+    const temp = tMin === tMax ? tMax + "°C" : tMin + "–" + tMax + "°C";
+    const dl = dirLong(meanDir(b.hrs));
+    let wind = wMax < 10 ? "light winds" : (/^[aeiou]/.test(dl) ? "an " : "a ") + dl + " of " + (wMin === wMax ? wMax : wMin + "–" + wMax) + " km/h";
+    if (g >= 35) wind += ", gusting to " + g;
+    return rain + ", " + temp + " and " + wind;
+  }
+  function topReasons(hrs) {
+    const count = {};
+    hrs.forEach(x => (x.play ? x.play.why : []).forEach(w => { count[w] = (count[w] || 0) + 1; }));
+    return Object.keys(count).sort((a, b) => count[b] - count[a]).slice(0, 2);
+  }
+  function minusMinutes(stamp, mins) {
+    const t = +stamp.slice(11, 13) * 60 + +stamp.slice(14, 16) - mins;
+    const r = Math.floor(t / 5) * 5;
+    const hh = Math.floor(r / 60), mm = r % 60;
+    return (hh % 12 === 0 ? 12 : hh % 12) + ":" + String(mm).padStart(2, "0") + (hh < 12 ? "am" : "pm");
+  }
+
+  function writeGolf(S) {
+    const out = [];
+    const today = S.days[S.ti], tom = S.days[S.ti + 1];
+    const from = Math.ceil(S.nowN - 0.25);
+    const b18 = bestWindow(today, 4, from);
+    if (b18) {
+      if (b18.v >= 45) out.push("Tee off around " + fmtH(b18.start.hr) + " for the best of today, " + windowCond(b18) + ".");
+      else {
+        const why = topReasons(b18.hrs);
+        out.push("The rest of today isn't good for golf" + (why.length ? ", with " + listJoin(why) + " the main problem" + (why.length > 1 ? "s" : "") : "") + ".");
+      }
+    } else {
+      const b9 = bestWindow(today, 2, from);
+      if (b9 && b9.v >= 45) out.push("There's still time for nine holes today if you tee off by " + fmtH(b9.start.hr) + ".");
+    }
+    if (tom) {
+      const bt = bestWindow(tom, 4);
+      if (bt) {
+        if (bt.v >= 45) out.push("Tomorrow's best window starts at " + fmtH(bt.start.hr) + " and looks " + playWord(bt.v) + ", " + windowCond(bt) + ".");
+        else { const why = topReasons(bt.hrs); out.push("Tomorrow looks poor for golf" + (why.length ? ", mainly because of " + listJoin(why) : "") + "."); }
+      }
+    }
+    const later = S.days.slice(S.ti + 2, S.ti + 7).map(d => ({ d, b: bestWindow(d, 4) })).filter(o => o.b);
+    if (later.length) {
+      const top = later.slice().sort((a, b) => b.b.v - a.b.v)[0];
+      if (top.b.v >= 65) out.push(top.d.name + " looks the best day for a round later in the week, from " + fmtH(top.b.start.hr) + ".");
+      const poor = later.filter(o => o.b.v < 45);
+      if (poor.length) {
+        const why = topReasons([].concat.apply([], poor.map(o => o.d.hrs.filter(x => x.play))));
+        out.push(listJoin(poor.map(o => o.d.name)) + (poor.length > 1 ? " look" : " looks") + " poor for golf" + (why.length ? ", mainly because of " + why[0] : "") + ".");
+      }
+    }
+    const ahead = S.days.slice(S.ti + 1, S.ti + 7);
+    const fogDays = ahead.filter(d => d.hrs.some(x => x.isDay && x.hr <= 10 && x.fog)).map(d => d.i === S.ti + 1 ? "tomorrow" : d.name);
+    const frostDays = ahead.filter(d => d.hrs.some(x => x.isDay && x.hr <= 10 && x.frost)).map(d => d.i === S.ti + 1 ? "tomorrow" : d.name);
+    if (fogDays.length) out.push("Fog could hold up the first tee times " + (fogDays[0] === "tomorrow" && fogDays.length === 1 ? "tomorrow" : "on " + listJoin(fogDays)) + ".");
+    if (frostDays.length) out.push("Frost could delay the first tee times " + (frostDays[0] === "tomorrow" && frostDays.length === 1 ? "tomorrow" : "on " + listJoin(frostDays)) + ".");
+    return out;
+  }
+
+  function groundText(S) {
+    const rain48 = sum(S.H.filter(x => x.n > S.nowN - 48 && x.n <= S.nowN).map(x => x.mm));
+    const amt = rain48 < 0.2 ? "No rain" : (rain48 < 1 ? "Under 1 mm" : r0(rain48) + " mm") + " of rain";
+    if (rain48 < 2) return amt + " in the last 48 hours, so the course should be firm and dry underfoot.";
+    if (rain48 < 15) return amt + " in the last 48 hours. Tīeke is built on natural river sand, so it should drain quickly.";
+    return amt + " in the last 48 hours. Expect some soft areas, even on Tīeke's sand base.";
+  }
+
+  function renderGolf() {
+    const lines = writeGolf(S);
+    $("golfRead").innerHTML = lines.length ? '<p class="lead">' + esc(lines[0]) + "</p>" + (lines.length > 1 ? "<p>" + esc(lines.slice(1).join(" ")) + "</p>" : "") : "";
+    renderTee();
+    const today = S.days[S.ti], tom = S.days[S.ti + 1];
+    const col = d => d && d.sunset ? [
+      fmtClock(d.sunrise), minusMinutes(d.sunset, 270), minusMinutes(d.sunset, 135), fmtClock(d.sunset),
+      d.uvFrom != null ? fmtH(d.uvFrom) + " to " + fmtH(d.uvTo % 24) : "Not needed"
+    ] : ["–", "–", "–", "–", "–"];
+    const a = col(today), b = col(tom);
+    const labels = ["First light", "Last tee time for 18 holes", "Last tee time for 9 holes", "Sunset", "Sunscreen needed"];
+    const rows = labels.map((l, k) => "<tr><td>" + l + '</td><td class="n">' + a[k] + '</td><td class="n">' + b[k] + "</td></tr>").join("");
+    $("golfFacts").innerHTML =
+      '<div class="col"><h3>Tee times and daylight</h3><div class="tablewrap"><table><thead><tr><th></th><th class="n">Today</th><th class="n">Tomorrow</th></tr></thead><tbody>' + rows + "</tbody></table></div>" +
+      '<p class="small">Last tee times allow about 4½ hours for 18 holes and 2¼ hours for 9, finishing by sunset.</p></div>' +
+      '<div class="col"><h3>Underfoot</h3><p>' + esc(groundText(S)) + "</p>" +
+      "<h3>Bookings</h3><p>Phone " + esc(PLACE.phone) + ' or book a tee time at <a href="' + PLACE.site + '" target="_blank" rel="noopener">tiekegolf.co.nz</a>.</p></div>';
+  }
+
+  const tee = $("tee"), teeTip = $("teeTip"), teeBox = $("teebox"), teeScroll = $("teescroll");
+  let teeGeo = null;
+  function hideTeeTip() { if (teeTip) teeTip.hidden = true; }
+
+  function renderTee() {
+    while (tee.firstChild) tee.removeChild(tee.firstChild);
+    const days = S.days.slice(S.ti, S.ti + 7);
+    const rises = days.filter(d => d.sunrise).map(d => +d.sunrise.slice(11, 13));
+    const sets = days.filter(d => d.sunset).map(d => +d.sunset.slice(11, 13));
+    if (!rises.length) return;
+    const h0 = Math.min.apply(null, rises), h1 = Math.max.apply(null, sets);
+    const ncol = h1 - h0 + 1;
+    const W = Math.max(teeScroll.clientWidth, 660);
+    const LBL = 86, RT = 112, TOP = 22, RH = 32, GAPY = 4;
+    const cw = (W - LBL - RT) / ncol;
+    const HGT = TOP + days.length * (RH + GAPY) + 4;
+    tee.setAttribute("width", W); tee.setAttribute("height", HGT); tee.setAttribute("viewBox", "0 0 " + W + " " + HGT);
+    const add = (tag, attrs) => el(tag, attrs, tee);
+    const say = (t, attrs) => { const e = add("text", attrs); e.textContent = t; return e; };
+    for (let h = h0; h <= h1; h++) if ((h - h0) % 2 === 0) say(fmtH(h), { x: LBL + (h - h0) * cw + 2, y: TOP - 8, class: "th" });
+    say("Best for 18", { x: W - RT + 10, y: TOP - 8, class: "th" });
+    const cells = [];
+    days.forEach((d, r) => {
+      const y = TOP + r * (RH + GAPY);
+      say(d.i === S.ti ? "Today" : d.name.slice(0, 3) + " " + dnum(d.date), { x: 0, y: y + RH / 2 + 4, class: "rl" });
+      const best = bestWindow(d, 4, d.i === S.ti ? Math.ceil(S.nowN - 0.25) : null);
+      for (let h = h0; h <= h1; h++) {
+        const x = d.hrs.find(q => q.hr === h);
+        const cx = LBL + (h - h0) * cw;
+        if (!x || !x.play) { add("rect", { x: cx + 1, y, width: cw - 2, height: RH, rx: 3, class: "dark" }); continue; }
+        const past = d.i === S.ti && x.n + 1 <= S.nowN;
+        const g = add("g", { opacity: past ? 0.35 : 1 });
+        el("rect", { x: cx + 1, y, width: cw - 2, height: RH, rx: 3, class: "cellbg" }, g);
+        el("rect", { x: cx + 1, y, width: cw - 2, height: RH, rx: 3, class: "cell", "fill-opacity": (0.08 + 0.87 * Math.pow(x.play.s / 100, 2)).toFixed(2) }, g);
+        if (x.fog) el("rect", { x: cx + 1, y, width: cw - 2, height: RH, rx: 3, class: "fog" }, g);
+        if (x.frost) el("rect", { x: cx + 1, y, width: cw - 2, height: RH, rx: 3, class: "frost" }, g);
+        if (x.mm >= 0.2) el("circle", { cx: cx + cw / 2, cy: y + RH / 2 - 3, r: 3.4, class: "rdot" }, g);
+        else if ((x.pop || 0) >= 50) el("circle", { cx: cx + cw / 2, cy: y + RH / 2 - 3, r: 3, class: "rring" }, g);
+        if ((x.gust || 0) >= 35) el("line", { x1: cx + 5, x2: cx + cw - 5, y1: y + RH - 6, y2: y + RH - 6, class: "gbar" }, g);
+        cells.push({ x: cx, y, w: cw, h: RH, d, row: x });
+      }
+      if (best) {
+        const bx = LBL + (best.start.hr - h0) * cw;
+        add("rect", { x: bx + 0.5, y: y - 1.5, width: cw * 4 - 1, height: RH + 3, rx: 4, class: "bestbox" });
+        say(fmtH(best.start.hr) + ", " + playWord(best.v), { x: W - RT + 10, y: y + RH / 2 + 4, class: "rl" });
+      } else say("–", { x: W - RT + 10, y: y + RH / 2 + 4, class: "rl" });
+    });
+    const hit = add("rect", { x: LBL, y: TOP, width: W - LBL - RT, height: HGT - TOP, class: "hit" });
+    teeGeo = { cells };
+    hit.addEventListener("pointermove", teeMove);
+    hit.addEventListener("pointerdown", teeMove);
+    hit.addEventListener("pointerleave", hideTeeTip);
+  }
+
+  function teeMove(ev) {
+    const r = tee.getBoundingClientRect();
+    const px = ev.clientX - r.left, py = ev.clientY - r.top;
+    const c = teeGeo.cells.find(k => px >= k.x && px < k.x + k.w && py >= k.y - 2 && py < k.y + k.h + 2);
+    if (!c) { hideTeeTip(); return; }
+    const x = c.row;
+    const row = (a, b) => '<div class="row"><span>' + a + "</span><span>" + b + "</span></div>";
+    let html = "<b>" + (c.d.i === S.ti ? "Today" : c.d.name.slice(0, 3)) + " " + fmtH(x.hr) + ", " + playWord(x.play.s) + "</b>" +
+      row("Temperature", r0(x.temp) + "°C, feels " + r0(x.feels != null ? x.feels : x.temp) + "°C") +
+      row("Rain", x.mm < 0.2 ? "dry, " + (x.pop || 0) + "% chance" : x.mm.toFixed(1) + " mm") +
+      row("Wind", dir16(x.dir) + " " + r0(x.wind || 0) + " km/h") +
+      row("Gusts", r0(x.gust || 0) + " km/h");
+    if (x.play.why.length) html += '<div class="flag">' + esc(cap(listJoin(x.play.why))) + "</div>";
+    teeTip.innerHTML = html;
+    teeTip.hidden = false;
+    const br = teeBox.getBoundingClientRect();
+    const tw = teeTip.offsetWidth, th = teeTip.offsetHeight;
+    let left = ev.clientX - br.left + 14;
+    if (left + tw > br.width - 8) left = ev.clientX - br.left - tw - 14;
+    left = Math.max(8, left);
+    let top = ev.clientY - br.top - th - 12;
+    if (top < 8) top = ev.clientY - br.top + 16;
+    teeTip.style.left = left + "px"; teeTip.style.top = top + "px";
+  }
+
   function hideTip() { tip.hidden = true; if (geo) geo.cross.setAttribute("visibility", "hidden"); }
 
   function move(ev) {
@@ -709,21 +935,31 @@
   function setRange(r) {
     range = r;
     try { localStorage.setItem("wx-range", String(r)); } catch (e) { /* storage unavailable */ }
-    document.querySelectorAll(".seg button").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.range === r)));
+    document.querySelectorAll("#rangeSeg button").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.range === r)));
     hideTip();
     if (S) renderChart();
   }
-  document.querySelectorAll(".seg button").forEach(b => b.addEventListener("click", () => setRange(+b.dataset.range)));
-  document.querySelectorAll(".seg button").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.range === range)));
+  document.querySelectorAll("#rangeSeg button").forEach(b => b.addEventListener("click", () => setRange(+b.dataset.range)));
+  document.querySelectorAll("#rangeSeg button").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.range === range)));
 
-  function renderAll() {
-    $("placeName").textContent = PLACE.name;
+  function applyPlaceChrome() {
+    $("placeName").innerHTML = esc(PLACE.name).replace(/T(ī)/g, 'T<span class="tk">$1</span>');
     $("region").textContent = PLACE.region;
     $("msLink").href = PLACE.metservice;
-    $("msLink").textContent = "MetService, " + PLACE.name;
+    $("msLink").textContent = "MetService, " + PLACE.metserviceName;
+    document.title = PLACE.title;
+    $("chart").setAttribute("aria-label", "Hourly temperature, chance of rain, wind and cloud for " + PLACE.name);
+    $("golfsec").hidden = !PLACE.golf;
+    document.querySelectorAll("#placeSeg button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.place === PLACE.key)));
+  }
+
+  function renderAll() {
+    applyPlaceChrome();
+    document.body.classList.remove("is-loading");
     if (selected == null || selected < S.ti || selected > S.ti + 6) selected = S.ti;
     renderNow();
     renderRead();
+    if (PLACE.golf) renderGolf();
     renderLedger();
     renderChart();
     renderDay();
@@ -731,44 +967,60 @@
     renderPast();
   }
 
+  function setPlace(key, fromHistory) {
+    if (!PLACES[key] || PLACE.key === key) return;
+    PLACE = PLACES[key];
+    if (!fromHistory) { try { history.pushState({ place: key }, "", PLACE.path); } catch (e) { /* address bar not available */ } }
+    S = null; selected = null; hideTip(); hideTeeTip();
+    applyPlaceChrome();
+    document.body.classList.add("is-loading");
+    $("stamp").textContent = "Loading the latest forecast";
+    $("read").innerHTML = '<p class="muted">Loading the latest forecast for ' + esc(PLACE.name) + ".</p>";
+    load();
+  }
+  document.querySelectorAll("#placeSeg button").forEach(b => b.addEventListener("click", () => setPlace(b.dataset.place)));
+  window.addEventListener("popstate", () => { const p = placeFromAddress(); if (p.key !== PLACE.key) setPlace(p.key, true); });
+
   function showError(msg) {
     $("read").innerHTML = '<div class="errorbox"><p class="lead">The forecast didn\'t load.</p><p>' + esc(msg) + ' Check your connection, then try again.</p><button type="button" id="retry">Try again</button></div>';
     $("stamp").textContent = "Couldn't reach the forecast service.";
     $("retry").addEventListener("click", load);
   }
 
-  let lastLoad = 0, loading = false;
+  let lastLoad = 0, seq = 0;
   async function load() {
-    if (loading) return;
-    loading = true;
+    const my = ++seq, place = PLACE;
     try {
       let main, models, ens;
       if (window.WX_SNAPSHOT) {
         snapshotMode = true;
-        ({ main, models, ens } = window.WX_SNAPSHOT);
+        const snap = window.WX_SNAPSHOT[place.key] || (window.WX_SNAPSHOT.main ? window.WX_SNAPSHOT : null);
+        if (!snap) throw new Error("this preview has no data for " + place.name);
+        ({ main, models, ens } = snap);
       } else {
-        const res = await Promise.allSettled([getJSON(URLS.main, 3), getJSON(URLS.models), getJSON(URLS.ens)]);
+        const U = urlsFor(place);
+        const res = await Promise.allSettled([getJSON(U.main, 3), getJSON(U.models), getJSON(U.ens)]);
         if (res[0].status !== "fulfilled") throw res[0].reason || new Error("No data");
         main = res[0].value;
         models = res[1].status === "fulfilled" ? res[1].value : null;
         ens = res[2].status === "fulfilled" ? res[2].value : null;
       }
+      if (my !== seq || place !== PLACE) return;
       S = build(main, models, ens);
       renderAll();
       lastLoad = Date.now();
     } catch (e) {
-      if (!S) showError(e && e.message ? "The service said: " + e.message + "." : "");
-    } finally {
-      loading = false;
+      if (my === seq && !S) showError(e && e.message ? "The service said: " + e.message + "." : "");
     }
   }
 
   let rt;
-  window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => { if (S) { hideTip(); renderChart(); } }, 150); });
+  window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => { if (S) { hideTip(); hideTeeTip(); renderChart(); if (PLACE.golf) renderTee(); } }, 150); });
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden && !window.WX_SNAPSHOT && Date.now() - lastLoad > REFRESH_MINUTES * 60000) load();
   });
   if (!window.WX_SNAPSHOT) setInterval(() => { if (!document.hidden) load(); }, REFRESH_MINUTES * 60000);
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (S) renderChart(); });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (S) { renderChart(); if (PLACE.golf) renderTee(); } });
+  applyPlaceChrome();
   load();
 })();
