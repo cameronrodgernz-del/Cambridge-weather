@@ -26,6 +26,14 @@ Each daylight hour scores out of 100 and loses points for rain (more for heavier
 
 The third tab, with its own link `/mount`. The hourly chart swaps the fog and frost strip for the tide curve (LINZ predictions for Tauranga, bundled in `tides-tauranga.js` for 2026 and 2027) and a waves panel from the Open-Meteo marine model. An "At the beach" section gives the next tides, wave size and direction, the cleanest mornings for a surf (light or offshore winds, which at Main Beach come from the south round to the west), sea temperature, and tide and swell tables. The tide file needs a new year of LINZ predictions added before the end of 2027.
 
+## Tee times
+
+The fourth tab, link `/golf`. It works out the golf weather hour by hour at 18 courses within about 50 minutes of Cambridge (listed in `courses.js` with fees, booking details and club days), finds the best stretch across the area, and shows the open tee times inside it.
+
+Eight clubs publish their tee sheets on Golf NZ's booking system: Cambridge, Te Awamutu, Hamilton (St Andrews), Ngāruawāhia, Huntly, Morrinsville, Matamata and Walton. `api/teesheet.js` is a small Vercel function that reads those public day sheets when the tab is opened and counts the spots open to the public or to affiliated golfers. Results are cached for ten minutes. The other courses take bookings by phone, form or walk-up, so they show the best weather window and how to book.
+
+Green fees, club days and closures in `courses.js` were checked in October 2026 and need an occasional refresh.
+
 ## Hosting
 
 It's a plain static site: `index.html`, `styles.css`, `app.js`. No build step and no keys. On Vercel, import the GitHub repository and deploy with the default settings (Framework preset: Other).

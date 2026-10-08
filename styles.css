@@ -47,6 +47,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html { -webkit-text-size-adjust: 100%; }
 body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.55;
   padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
@@ -177,6 +178,35 @@ body.coast .lg-inland, body:not(.coast) .lg-coast { display: none !important; }
 .tides small { color: var(--muted); font-family: var(--mono); font-size: 11.5px; }
 @media (max-width: 900px) { .beachdetail { grid-template-columns: 1fr; } }
 @media (max-width: 440px) { .placeseg button { padding: 8px 9px; font-size: 13px; } }
+
+/* tee times */
+.vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+body.finder .wrap > section:not(#findersec), body.finder .now { display: none !important; }
+.finder-controls { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+.dayseg { flex-wrap: wrap; }
+#findersec .readtext { max-width: 74ch; }
+#finderGrid { display: block; }
+#finderGrid text { font-family: var(--mono); font-size: 10.5px; fill: var(--muted); }
+#finderGrid .rl { font-family: var(--body); font-size: 12.5px; font-weight: 600; fill: var(--ink); }
+#finderGrid .rs { font-size: 10px; }
+#finderGrid .rr { font-family: var(--body); font-size: 12px; fill: var(--ink); }
+#finderGrid .th { font-size: 10px; }
+#finderGrid .dark { fill: var(--night); }
+#finderGrid .cellbg { fill: var(--surface); }
+#finderGrid .hit { fill: transparent; cursor: pointer; }
+.shut { fill: url(#p-shut); }
+.pat-shut { stroke: var(--muted); }
+.tick { stroke: var(--ink); stroke-width: 1.6; stroke-linecap: round; }
+.besttick { stroke-width: 2.4; }
+.bestdot { fill: var(--sun); stroke: var(--ink); stroke-width: 1.2; }
+.winbox { fill: none; stroke: var(--ink); stroke-width: 2; stroke-dasharray: 5 3; }
+.finderlist { display: flex; flex-direction: column; gap: 28px; }
+.fgroup { display: flex; flex-direction: column; gap: 8px; }
+.ftable td { vertical-align: top; }
+.ftable td:first-child { min-width: 220px; }
+.ftable td.n, .ftable th.n { text-align: right; padding-right: 14px; }
+.placeseg .long { display: inline; }
+@media (max-width: 480px) { .placeseg .long { display: none; } }
 
 /* range buttons */
 .seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; background: var(--surface); }

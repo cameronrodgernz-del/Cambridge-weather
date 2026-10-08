@@ -20,6 +20,11 @@
       key: "mount", name: "Mount Maunganui", title: "Mount Maunganui Weather", region: "Bay of Plenty",
       lat: -37.6330, lon: 176.1800, path: "/mount", coast: true,
       metservice: "https://www.metservice.com/towns-cities/locations/mount-maunganui", metserviceName: "Mount Maunganui"
+    },
+    golf: {
+      key: "golf", name: "Tee times", title: "Waikato Tee Times", region: "Golf within 50 minutes of Cambridge",
+      path: "/golf", finder: true,
+      metservice: "https://www.metservice.com/towns-cities/locations/hamilton", metserviceName: "Hamilton"
     }
   };
   const TIMEZONE = "Pacific/Auckland";
@@ -28,6 +33,7 @@
     try { path = location.pathname.replace(/\/+$/, "").toLowerCase(); q = new URLSearchParams(location.search).get("place"); } catch (e) { /* no location */ }
     if (path.endsWith("/tieke") || q === "tieke") return PLACES.tieke;
     if (path.endsWith("/mount") || q === "mount") return PLACES.mount;
+    if (path.endsWith("/golf") || q === "golf") return PLACES.golf;
     if (window.WX_PLACE && PLACES[window.WX_PLACE]) return PLACES[window.WX_PLACE];
     return PLACES.cambridge;
   }
@@ -1117,6 +1123,8 @@
     document.title = PLACE.title;
     $("chart").setAttribute("aria-label", "Hourly temperature, chance of rain, wind and cloud for " + PLACE.name);
     $("golfsec").hidden = !PLACE.golf;
+    document.body.classList.toggle("finder", !!PLACE.finder);
+    if ($("findersec")) $("findersec").hidden = !PLACE.finder;
     $("beachsec").hidden = !PLACE.coast;
     document.body.classList.toggle("coast", !!PLACE.coast);
     document.querySelectorAll("#placeSeg button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.place === PLACE.key)));
@@ -1143,9 +1151,11 @@
     if (!fromHistory) { try { history.pushState({ place: key }, "", PLACE.path); } catch (e) { /* address bar not available */ } }
     S = null; selected = null; hideTip(); hideTeeTip();
     applyPlaceChrome();
-    document.body.classList.add("is-loading");
+    if (!PLACE.finder) {
+      document.body.classList.add("is-loading");
+      $("read").innerHTML = '<p class="muted">Loading the latest forecast for ' + esc(PLACE.name) + ".</p>";
+    }
     $("stamp").textContent = "Loading the latest forecast";
-    $("read").innerHTML = '<p class="muted">Loading the latest forecast for ' + esc(PLACE.name) + ".</p>";
     load();
   }
   document.querySelectorAll("#placeSeg button").forEach(b => b.addEventListener("click", () => setPlace(b.dataset.place)));
@@ -1159,6 +1169,8 @@
 
   let lastLoad = 0, seq = 0;
   async function load() {
+    if (PLACE.finder) { if (window.Finder) window.Finder.activate(); return; }
+    if (window.Finder) window.Finder.deactivate();
     const my = ++seq, place = PLACE;
     try {
       let main, models, ens, marine;
@@ -1186,12 +1198,20 @@
   }
 
   let rt;
-  window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => { if (S) { hideTip(); hideTeeTip(); renderChart(); if (PLACE.golf) renderTee(); } }, 150); });
+  window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => {
+    if (PLACE.finder) { if (window.Finder) window.Finder.resize(); return; }
+    if (S) { hideTip(); hideTeeTip(); renderChart(); if (PLACE.golf) renderTee(); }
+  }, 150); });
   document.addEventListener("visibilitychange", () => {
-    if (!document.hidden && !window.WX_SNAPSHOT && Date.now() - lastLoad > REFRESH_MINUTES * 60000) load();
+    if (document.hidden || window.WX_SNAPSHOT || Date.now() - lastLoad <= REFRESH_MINUTES * 60000) return;
+    if (PLACE.finder) { lastLoad = Date.now(); if (window.Finder) window.Finder.refresh(); } else load();
   });
-  if (!window.WX_SNAPSHOT) setInterval(() => { if (!document.hidden) load(); }, REFRESH_MINUTES * 60000);
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (S) { renderChart(); if (PLACE.golf) renderTee(); } });
+  if (!window.WX_SNAPSHOT) setInterval(() => { if (document.hidden) return; if (PLACE.finder) { if (window.Finder) window.Finder.refresh(); } else load(); }, REFRESH_MINUTES * 60000);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => {
+    if (PLACE.finder) { if (window.Finder) window.Finder.resize(); return; }
+    if (S) { renderChart(); if (PLACE.golf) renderTee(); }
+  });
+  window.WXCORE = { tnum, fmtH, fmtClock, wd, dnum, mon, esc, cap, listJoin, dir16, dirLong, meanDir, playScore, playWord };
   applyPlaceChrome();
   load();
 })();

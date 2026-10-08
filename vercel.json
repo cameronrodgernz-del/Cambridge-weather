@@ -8,6 +8,10 @@
     {
       "source": "/mount",
       "destination": "/"
+    },
+    {
+      "source": "/golf",
+      "destination": "/"
     }
   ],
   "headers": [
