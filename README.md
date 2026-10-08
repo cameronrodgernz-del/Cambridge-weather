@@ -34,6 +34,10 @@ Eight clubs publish their tee sheets on Golf NZ's booking system: Cambridge, Te 
 
 Green fees, club days and closures in `courses.js` were checked in October 2026 and need an occasional refresh.
 
+## Wellington and Royal Wellington
+
+Two more tabs. Wellington (`/wellington`) is the full weather page for the city, with the harbour tide in the hourly chart from LINZ predictions for Wellington (`tides-wellington.js`, 2026 and 2027). Royal Wellington Golf Club (`/royal-wellington`) has the golf layout: best times to play, the seven-day tee sheet, last tee times, ground after rain, bookings and green fees. The club takes visitor bookings by form or phone, so there are no live open tee times for it.
+
 ## Hosting
 
 It's a plain static site: `index.html`, `styles.css`, `app.js`. No build step and no keys. On Vercel, import the GitHub repository and deploy with the default settings (Framework preset: Other).

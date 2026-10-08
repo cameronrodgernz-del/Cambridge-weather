@@ -14,12 +14,29 @@
       key: "tieke", name: "Tīeke Golf Estate", title: "Tīeke Golf Weather", region: "Tamahere, Waikato",
       lat: -37.8650, lon: 175.3479, path: "/tieke", golf: true,
       metservice: "https://www.metservice.com/towns-cities/locations/hamilton", metserviceName: "Hamilton",
-      site: "https://www.tiekegolf.co.nz/", phone: "07 843 6287"
+      site: "https://www.tiekegolf.co.nz/book-a-tee-time/", siteLabel: "tiekegolf.co.nz", phone: "07 843 6287",
+      bookHow: "book a tee time at",
+      drainNote: "Tīeke is built on natural river sand, so it should drain quickly.",
+      wetNote: "Expect some soft areas, even on Tīeke's sand base.",
+      feesText: "$130 for 18 holes and $80 for 9 for Waikato affiliated golfers; visitors $170 and $100."
     },
     mount: {
       key: "mount", name: "Mount Maunganui", title: "Mount Maunganui Weather", region: "Bay of Plenty",
-      lat: -37.6330, lon: 176.1800, path: "/mount", coast: true,
+      lat: -37.6330, lon: 176.1800, path: "/mount", coast: true, tides: "tauranga", tideLabel: "Tauranga", marine: true, beach: true,
       metservice: "https://www.metservice.com/towns-cities/locations/mount-maunganui", metserviceName: "Mount Maunganui"
+    },
+    wellington: {
+      key: "wellington", name: "Wellington", title: "Wellington Weather", region: "Wellington, New Zealand",
+      lat: -41.2865, lon: 174.7762, path: "/wellington", coast: true, tides: "wellington", tideLabel: "Wellington harbour",
+      metservice: "https://www.metservice.com/towns-cities/locations/wellington", metserviceName: "Wellington"
+    },
+    royalwellington: {
+      key: "royalwellington", name: "Royal Wellington Golf Club", title: "Royal Wellington Golf Weather", region: "Heretaunga, Upper Hutt",
+      lat: -41.1361, lon: 175.0190, path: "/royal-wellington", golf: true,
+      metservice: "https://www.metservice.com/towns-cities/locations/upper-hutt", metserviceName: "Upper Hutt",
+      site: "https://www.royalwellington.com/bookings", siteLabel: "royalwellington.com", phone: "04 528 1934",
+      bookHow: "fill in the booking form at",
+      feesText: "Heretaunga course $210 for 18 holes for NZGA affiliated golfers, $320 for visitors. Terrace course $175 for 18, $110 for 9. Juniors half price."
     },
     golf: {
       key: "golf", name: "Tee times", title: "Waikato Tee Times", region: "Golf within 50 minutes of Cambridge",
@@ -31,9 +48,8 @@
   function placeFromAddress() {
     let path = "", q = null;
     try { path = location.pathname.replace(/\/+$/, "").toLowerCase(); q = new URLSearchParams(location.search).get("place"); } catch (e) { /* no location */ }
-    if (path.endsWith("/tieke") || q === "tieke") return PLACES.tieke;
-    if (path.endsWith("/mount") || q === "mount") return PLACES.mount;
-    if (path.endsWith("/golf") || q === "golf") return PLACES.golf;
+    const hit = Object.values(PLACES).find(pl => pl.path !== "/" && (path.endsWith(pl.path) || q === pl.key));
+    if (hit) return hit;
     if (window.WX_PLACE && PLACES[window.WX_PLACE]) return PLACES[window.WX_PLACE];
     return PLACES.cambridge;
   }
@@ -67,7 +83,7 @@
     ens: "https://ensemble-api.open-meteo.com/v1/ensemble?" + qs(Object.assign({}, common, {
       forecast_days: 8, hourly: "precipitation", models: "ecmwf_ifs025"
     })),
-    marine: place.coast ? "https://marine-api.open-meteo.com/v1/marine?" + qs(Object.assign({}, common, {
+    marine: place.marine ? "https://marine-api.open-meteo.com/v1/marine?" + qs(Object.assign({}, common, {
       forecast_days: 8,
       hourly: "wave_height,wave_direction,wave_period,swell_wave_height,swell_wave_direction,swell_wave_period,sea_surface_temperature"
     })) : null
@@ -229,7 +245,7 @@
         x.sst = g("sea_surface_temperature", i);
       });
     }
-    if (PLACE.coast) H.forEach(x => { x.tide = tideAt(x.n); });
+    if (PLACE.tides) H.forEach(x => { x.tide = tideAt(x.n); });
 
     const cur = main.current;
     const nowN = tnum(cur.time);
@@ -602,14 +618,15 @@
       { key: "wind", title: "Wind and gusts km/h", h: 104, min: 0, max: wHi, ticks: wTicks },
       { key: "cloud", title: "Cloud cover %", h: 66, min: 0, max: 100, ticks: [0, 50, 100] }
     ];
-    if (PLACE.coast) {
-      panels.push({ key: "tide", title: "Tide m (Tauranga)", h: 84, min: -0.35, max: 2.45, ticks: [0, 1, 2] });
+    if (PLACE.tides) panels.push({ key: "tide", title: "Tide m (" + PLACE.tideLabel + ")", h: 84, min: -0.35, max: 2.45, ticks: [0, 1, 2] });
+    if (S.hasMarine) {
       const wMaxM = maxOf(rows.map(r => r.wave)) || 1;
       const wTop = Math.max(1.5, Math.ceil((wMaxM + 0.3) * 2) / 2);
       const step = wTop > 2.5 ? 1 : 0.5;
       const wt = []; for (let v = 0; v <= wTop + 1e-9; v += step) wt.push(+v.toFixed(1));
-      if (S.hasMarine) panels.push({ key: "waves", title: "Waves m", h: 70, min: 0, max: wTop, ticks: wt });
-    } else {
+      panels.push({ key: "waves", title: "Waves m", h: 70, min: 0, max: wTop, ticks: wt });
+    }
+    if (!PLACE.coast) {
       panels.push({ key: "strip", title: "Fog and frost risk", h: 16, min: 0, max: 1, ticks: [] });
     }
     const GAP = 30;
@@ -723,7 +740,7 @@
         el("path", { d, class: "tideline" });
       }
       tidesBetween(t0, t0 + N).forEach(e => {
-        const cx = x(e.n - t0), cy = sy(pTide, e.h), hi = e.h > 1;
+        const cx = x(e.n - t0), cy = sy(pTide, e.h), hi = e.hi;
         el("circle", { cx, cy, r: 3.5, class: "tidept" });
         txt(fmtClock(e.t), { x: Math.min(Math.max(cx, L + 22), W - R - 22), y: hi ? cy - 8 : cy + 15, "text-anchor": "middle" });
       });
@@ -862,8 +879,8 @@
     const rain48 = sum(S.H.filter(x => x.n > S.nowN - 48 && x.n <= S.nowN).map(x => x.mm));
     const amt = rain48 < 0.2 ? "No rain" : (rain48 < 1 ? "Under 1 mm" : r0(rain48) + " mm") + " of rain";
     if (rain48 < 2) return amt + " in the last 48 hours, so the course should be firm and dry underfoot.";
-    if (rain48 < 15) return amt + " in the last 48 hours. Tīeke is built on natural river sand, so it should drain quickly.";
-    return amt + " in the last 48 hours. Expect some soft areas, even on Tīeke's sand base.";
+    if (rain48 < 15) return amt + " in the last 48 hours. " + (PLACE.drainNote || "The course may be soft in places.");
+    return amt + " in the last 48 hours. " + (PLACE.wetNote || "Expect some soft and wet areas.");
   }
 
   function renderGolf() {
@@ -882,7 +899,8 @@
       '<div class="col"><h3>Tee times and daylight</h3><div class="tablewrap"><table><thead><tr><th></th><th class="n">Today</th><th class="n">Tomorrow</th></tr></thead><tbody>' + rows + "</tbody></table></div>" +
       '<p class="small">Last tee times allow about 4½ hours for 18 holes and 2¼ hours for 9, finishing by sunset.</p></div>' +
       '<div class="col"><h3>Underfoot</h3><p>' + esc(groundText(S)) + "</p>" +
-      "<h3>Bookings</h3><p>Phone " + esc(PLACE.phone) + ' or book a tee time at <a href="' + PLACE.site + '" target="_blank" rel="noopener">tiekegolf.co.nz</a>.</p></div>';
+      "<h3>Bookings</h3><p>Phone " + esc(PLACE.phone) + " or " + esc(PLACE.bookHow || "book at") + ' <a href="' + PLACE.site + '" target="_blank" rel="noopener">' + esc(PLACE.siteLabel || PLACE.site) + "</a>.</p>" +
+      (PLACE.feesText ? "<h3>Green fees</h3><p>" + esc(PLACE.feesText) + "</p>" : "") + "</div>";
   }
 
   const tee = $("tee"), teeTip = $("teeTip"), teeBox = $("teebox"), teeScroll = $("teescroll");
@@ -966,8 +984,21 @@
 
 
   /* ---------- beach ---------- */
-  const TIDE_N = (window.TIDES_TAURANGA || []).map(e => ({ t: e[0], n: tnum(e[0]), h: e[1] }));
+  const tideCache = {};
+  function tideSet() {
+    const key = PLACE.tides;
+    if (!key) return [];
+    if (!tideCache[key]) {
+      const raw = window["TIDES_" + key.toUpperCase()] || [];
+      tideCache[key] = raw.map((e, i) => {
+        const nb = [raw[i - 1], raw[i + 1]].filter(Boolean).map(q => q[1]);
+        return { t: e[0], n: tnum(e[0]), h: e[1], hi: nb.length ? e[1] > nb.reduce((a, b) => a + b, 0) / nb.length : e[1] > 1 };
+      });
+    }
+    return tideCache[key];
+  }
   function tideAt(n) {
+    const TIDE_N = tideSet();
     let lo = 0, hi = TIDE_N.length - 1;
     if (hi < 1 || n < TIDE_N[0].n || n > TIDE_N[hi].n) return null;
     while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (TIDE_N[mid].n <= n) lo = mid; else hi = mid; }
@@ -975,7 +1006,7 @@
     const f = (n - a.n) / (b.n - a.n);
     return a.h + (b.h - a.h) * (1 - Math.cos(Math.PI * f)) / 2;
   }
-  function tidesBetween(n0, n1) { return TIDE_N.filter(e => e.n >= n0 && e.n <= n1); }
+  function tidesBetween(n0, n1) { return tideSet().filter(e => e.n >= n0 && e.n <= n1); }
   // Main Beach faces north-east, so winds from the south round to the west blow offshore.
   const offshore = d => d != null && d >= 170 && d <= 280;
   const onshore = d => d != null && (d <= 120 || d >= 330);
@@ -1001,7 +1032,7 @@
     const out = [];
     const nx = tidesBetween(S.nowN, S.nowN + 30).slice(0, 2);
     if (nx.length === 2) {
-      const kind = e => e.h > 1 ? "high" : "low";
+      const kind = e => e.hi ? "high" : "low";
       out.push("The next " + kind(nx[0]) + " tide is at " + fmtClock(nx[0].t) + dayTag(S, nx[0].t.slice(0, 10)) + ", then " + kind(nx[1]) + " tide at " + fmtClock(nx[1].t) + dayTag(S, nx[1].t.slice(0, 10)) + ".");
     }
     if (S.hasMarine) {
@@ -1042,8 +1073,8 @@
     const days = S.days.slice(S.ti, S.ti + 4);
     const label = d => d.i === S.ti ? "Today" : d.name.slice(0, 3) + " " + dnum(d.date);
     const tideRows = days.map(d => {
-      const es = TIDE_N.filter(e => e.t.slice(0, 10) === d.date);
-      const cells = es.map(e => '<td class="' + (e.h > 1 ? "hl" : "") + '">' + (e.h > 1 ? "High " : "Low ") + fmtClock(e.t) + " <small>" + e.h.toFixed(1) + "</small></td>");
+      const es = tideSet().filter(e => e.t.slice(0, 10) === d.date);
+      const cells = es.map(e => '<td class="' + (e.hi ? "hl" : "") + '">' + (e.hi ? "High " : "Low ") + fmtClock(e.t) + " <small>" + e.h.toFixed(1) + "</small></td>");
       while (cells.length < 4) cells.push("<td></td>");
       return '<tr><td class="part">' + label(d) + "</td>" + cells.join("") + "</tr>";
     }).join("");
@@ -1125,8 +1156,11 @@
     $("golfsec").hidden = !PLACE.golf;
     document.body.classList.toggle("finder", !!PLACE.finder);
     if ($("findersec")) $("findersec").hidden = !PLACE.finder;
-    $("beachsec").hidden = !PLACE.coast;
+    $("beachsec").hidden = !PLACE.beach;
     document.body.classList.toggle("coast", !!PLACE.coast);
+    document.body.classList.toggle("has-tide", !!PLACE.tides);
+    document.body.classList.toggle("has-wave", !!PLACE.marine);
+    if ($("tee")) $("tee").setAttribute("aria-label", "Golf conditions by hour for the next seven days at " + PLACE.name);
     document.querySelectorAll("#placeSeg button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.place === PLACE.key)));
   }
 
@@ -1137,7 +1171,7 @@
     renderNow();
     renderRead();
     if (PLACE.golf) renderGolf();
-    if (PLACE.coast) renderBeach();
+    if (PLACE.beach) renderBeach();
     renderLedger();
     renderChart();
     renderDay();

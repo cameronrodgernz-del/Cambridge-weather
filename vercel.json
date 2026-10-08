@@ -12,6 +12,14 @@
     {
       "source": "/golf",
       "destination": "/"
+    },
+    {
+      "source": "/wellington",
+      "destination": "/"
+    },
+    {
+      "source": "/royal-wellington",
+      "destination": "/"
     }
   ],
   "headers": [

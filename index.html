@@ -71,6 +71,8 @@
         <button type="button" data-place="tieke" aria-pressed="false">T<span class="tk">ī</span>eke<span class="long"> Golf Estate</span></button>
         <button type="button" data-place="mount" aria-pressed="false">Mt Maunganui</button>
         <button type="button" data-place="golf" aria-pressed="false">Tee times</button>
+        <button type="button" data-place="wellington" aria-pressed="false">Wellington</button>
+        <button type="button" data-place="royalwellington" aria-pressed="false">Royal Wellington</button>
       </div>
       <span class="eyebrow" id="region">Waikato, New Zealand</span>
       <h1 id="placeName">Cambridge</h1>
@@ -157,8 +159,8 @@
         <span><i class="sw" style="background:var(--cloudfill);border:1px solid var(--cloud)"></i>Cloud cover</span>
         <span class="lg-inland"><svg class="swp" viewBox="0 0 14 10" aria-hidden="true"><rect width="14" height="10" fill="url(#p-fog)"/></svg>Fog risk</span>
         <span class="lg-inland"><svg class="swp" viewBox="0 0 14 10" aria-hidden="true"><rect width="14" height="10" fill="url(#p-frost)"/></svg>Frost risk</span>
-        <span class="lg-coast"><i class="sw" style="background:var(--tidefill);border:1px solid var(--tide)"></i>Tide</span>
-        <span class="lg-coast"><i class="sw" style="background:var(--wavefill);border:1px solid var(--wave)"></i>Waves</span>
+        <span class="lg-tide"><i class="sw" style="background:var(--tidefill);border:1px solid var(--tide)"></i>Tide</span>
+        <span class="lg-wave"><i class="sw" style="background:var(--wavefill);border:1px solid var(--wave)"></i>Waves</span>
       </div>
       <div class="chartscroll" id="chartscroll"><svg id="chart" role="img" aria-label="Hourly temperature, chance of rain, wind and cloud for Cambridge"></svg></div>
       <div class="tip" id="tip" hidden></div>
@@ -187,7 +189,7 @@
     <p id="dataNote">Forecast data from Open-Meteo, refreshed every time the page loads and every 30 minutes while it's open.</p>
     <ul>
       <li><a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0): blended hourly forecast, the ECMWF, UK Met Office, GFS, ICON, GEM and JMA models, the 51-run ECMWF ensemble, and the marine model for waves and sea temperature.</li>
-      <li><a href="https://www.linz.govt.nz/products-services/tides-and-tidal-streams/tide-predictions" target="_blank" rel="noopener">LINZ tide predictions</a> (CC BY 4.0) for Tauranga, 2026 and 2027.</li>
+      <li><a href="https://www.linz.govt.nz/products-services/tides-and-tidal-streams/tide-predictions" target="_blank" rel="noopener">LINZ tide predictions</a> (CC BY 4.0) for Tauranga and Wellington, 2026 and 2027.</li>
       <li>Official forecasts and any warnings: <a id="msLink" href="https://www.metservice.com/towns-cities/locations/cambridge" target="_blank" rel="noopener">MetService, Cambridge</a> and <a href="https://www.metservice.com/warnings/home" target="_blank" rel="noopener">MetService warnings</a>.</li>
     </ul>
   </footer>
@@ -195,6 +197,7 @@
 </div>
 
 <script src="/tides-tauranga.js"></script>
+<script src="/tides-wellington.js"></script>
 <script src="/courses.js"></script>
 <script src="/finder.js"></script>
 <script src="/app.js"></script>

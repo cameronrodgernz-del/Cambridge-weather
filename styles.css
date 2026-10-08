@@ -135,7 +135,8 @@ section { display: flex; flex-direction: column; gap: 16px; }
 
 /* location switch */
 .tk { margin-left: 0.08em; }
-.placeseg { align-self: flex-start; margin-bottom: 6px; }
+.seg.placeseg { align-self: flex-start; margin-bottom: 6px; flex-wrap: wrap; gap: 6px; border: 0; background: transparent; overflow: visible; border-radius: 0; }
+.placeseg button { border: 1px solid var(--rule) !important; border-radius: 6px; background: var(--surface); }
 .placeseg button { padding: 8px 14px; font-size: 13.5px; font-kerning: none; }
 body.is-loading .wrap > section:not(.read), body.is-loading .now { opacity: 0.45; transition: opacity 0.2s; }
 
@@ -169,7 +170,7 @@ body.is-loading .wrap > section:not(.read), body.is-loading .now { opacity: 0.45
 #chart .tidept { fill: var(--tide); stroke: var(--surface); stroke-width: 2; }
 #chart .wavefill { fill: var(--wavefill); }
 #chart .waveline { fill: none; stroke: var(--wave); stroke-width: 2; stroke-linejoin: round; }
-body.coast .lg-inland, body:not(.coast) .lg-coast { display: none !important; }
+body.coast .lg-inland, body:not(.has-tide) .lg-tide, body:not(.has-wave) .lg-wave { display: none !important; }
 #beachsec .readtext { max-width: 72ch; }
 .beachdetail { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px 48px; align-items: start; }
 .beachdetail .col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
