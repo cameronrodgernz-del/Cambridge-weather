@@ -38,6 +38,17 @@
       bookHow: "fill in the booking form at",
       feesText: "Heretaunga course $210 for 18 holes for NZGA affiliated golfers, $320 for visitors. Terrace course $175 for 18, $110 for 9. Juniors half price."
     },
+    royalauckland: {
+      key: "royalauckland", name: "Royal Auckland and Grange Golf Club", title: "Royal Auckland Golf Weather", region: "Papatoetoe, Auckland",
+      lat: -36.9611, lon: 174.8451, path: "/royal-auckland", golf: true,
+      metservice: "https://www.metservice.com/towns-cities/locations/auckland", metserviceName: "Auckland",
+      site: "https://raggc.com/visitors/", siteLabel: "raggc.com", phone: "09 975 6330",
+      bookHow: "book online through the visitor portal at",
+      bookNote: "Visitor times open 10 days ahead and are mostly on weekdays, first thing or around midday. Golfers from Auckland clubs can't book as visitors.",
+      drainNote: "Every green has SubAir drainage, so the greens should firm up quickly.",
+      wetNote: "The greens have SubAir drainage, but the fairways may be soft.",
+      feesText: "Summer 2026–27 visitor rates: $450 for 18 holes, $250 for 9 and $625 for all 27. Overseas visitors pay double. Online bookings add a 4% fee."
+    },
     richhill: {
       key: "richhill", name: "Rich Hill Stud", title: "Rich Hill Stud Weather", region: "Walton, near Matamata",
       lat: -37.7440, lon: 175.7040, path: "/rich-hill", farm: true,
@@ -906,7 +917,7 @@
       '<div class="col"><h3>Tee times and daylight</h3><div class="tablewrap"><table><thead><tr><th></th><th class="n">Today</th><th class="n">Tomorrow</th></tr></thead><tbody>' + rows + "</tbody></table></div>" +
       '<p class="small">Last tee times allow about 4½ hours for 18 holes and 2¼ hours for 9, finishing by sunset.</p></div>' +
       '<div class="col"><h3>Underfoot</h3><p>' + esc(groundText(S)) + "</p>" +
-      "<h3>Bookings</h3><p>Phone " + esc(PLACE.phone) + " or " + esc(PLACE.bookHow || "book at") + ' <a href="' + PLACE.site + '" target="_blank" rel="noopener">' + esc(PLACE.siteLabel || PLACE.site) + "</a>.</p>" +
+      "<h3>Bookings</h3><p>Phone " + esc(PLACE.phone) + " or " + esc(PLACE.bookHow || "book at") + ' <a href="' + PLACE.site + '" target="_blank" rel="noopener">' + esc(PLACE.siteLabel || PLACE.site) + "</a>." + (PLACE.bookNote ? " " + esc(PLACE.bookNote) : "") + "</p>" +
       (PLACE.feesText ? "<h3>Green fees</h3><p>" + esc(PLACE.feesText) + "</p>" : "") + "</div>";
   }
 

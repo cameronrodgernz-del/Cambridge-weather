@@ -22,6 +22,10 @@
       "destination": "/"
     },
     {
+      "source": "/royal-auckland",
+      "destination": "/"
+    },
+    {
       "source": "/rich-hill",
       "destination": "/"
     }

@@ -38,6 +38,10 @@ Green fees, club days and closures in `courses.js` were checked in October 2026 
 
 Two more tabs. Wellington (`/wellington`) is the full weather page for the city, with the harbour tide in the hourly chart from LINZ predictions for Wellington (`tides-wellington.js`, 2026 and 2027). Royal Wellington Golf Club (`/royal-wellington`) has the golf layout: best times to play, the seven-day tee sheet, last tee times, ground after rain, bookings and green fees. The club takes visitor bookings by form or phone, so there are no live open tee times for it.
 
+## Royal Auckland
+
+Tab `/royal-auckland`, for Royal Auckland and Grange Golf Club at 57 Grange Road, Papatoetoe. Same golf layout as Royal Wellington: best times to play, the seven-day tee sheet, last tee times, ground after rain (every green has SubAir drainage), bookings and the summer 2026–27 visitor rates. Visitors book through the club's online portal at raggc.com, mostly on weekdays, up to 10 days ahead.
+
 ## Rich Hill Stud
 
 Tab `/rich-hill`, for the farm at 570 Landsdowne Road, Walton. It has the full weather page plus an "On the farm" section: the roughest night of the week for mares and foals (rain, wind and feels-like low, 6pm to 8am), frost mornings, soil temperature at 6 cm for grass growth, whether paddocks are drying or getting wetter (rain against evaporation for the past week and the week ahead), and the best dry spell for paddock work.
