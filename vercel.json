@@ -20,6 +20,10 @@
     {
       "source": "/royal-wellington",
       "destination": "/"
+    },
+    {
+      "source": "/rich-hill",
+      "destination": "/"
     }
   ],
   "headers": [

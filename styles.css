@@ -209,6 +209,22 @@ body.finder .wrap > section:not(#findersec), body.finder .now { display: none !i
 .placeseg .long { display: inline; }
 @media (max-width: 480px) { .placeseg .long { display: none; } }
 
+/* farm */
+#farmsec .readtext { max-width: 74ch; }
+.farmdetail { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 28px 48px; align-items: start; }
+.farmdetail .col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.farmdetail tr.rough td { font-weight: 600; }
+#farmWater svg { width: 100%; height: auto; display: block; }
+#farmWater svg text { font-family: var(--mono); font-size: 11px; fill: var(--muted); }
+#farmWater .wgrid { stroke: var(--rule); }
+#farmWater .wtoday { stroke: var(--faint); stroke-dasharray: 3 3; }
+#farmWater .wrain { fill: var(--rain); }
+#farmWater .wevap { fill: var(--temp); fill-opacity: 0.55; }
+.key { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.keyrain { background: var(--rain); }
+.keyevap { background: var(--temp); opacity: 0.55; }
+@media (max-width: 860px) { .farmdetail { grid-template-columns: 1fr; } }
+
 /* range buttons */
 .seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; background: var(--surface); }
 .seg button { border: 0; background: transparent; padding: 7px 12px; font-size: 13px; cursor: pointer; color: var(--muted); }

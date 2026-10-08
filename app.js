@@ -38,6 +38,11 @@
       bookHow: "fill in the booking form at",
       feesText: "Heretaunga course $210 for 18 holes for NZGA affiliated golfers, $320 for visitors. Terrace course $175 for 18, $110 for 9. Juniors half price."
     },
+    richhill: {
+      key: "richhill", name: "Rich Hill Stud", title: "Rich Hill Stud Weather", region: "Walton, near Matamata",
+      lat: -37.7440, lon: 175.7040, path: "/rich-hill", farm: true,
+      metservice: "https://www.metservice.com/towns-cities/locations/matamata", metserviceName: "Matamata"
+    },
     golf: {
       key: "golf", name: "Tee times", title: "Waikato Tee Times", region: "Golf within 50 minutes of Cambridge",
       path: "/golf", finder: true,
@@ -73,8 +78,8 @@
     main: "https://api.open-meteo.com/v1/forecast?" + qs(Object.assign({}, common, {
       forecast_days: 8, past_days: 7, wind_speed_unit: "kmh",
       current: "temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m,wind_gusts_10m,is_day",
-      hourly: "temperature_2m,apparent_temperature,relative_humidity_2m,dew_point_2m,precipitation_probability,precipitation,cloud_cover,visibility,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index,weather_code,is_day",
-      daily: "temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_gusts_10m_max,sunrise,sunset,daylight_duration,uv_index_max"
+      hourly: "temperature_2m,apparent_temperature,relative_humidity_2m,dew_point_2m,precipitation_probability,precipitation,cloud_cover,visibility,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index,weather_code,is_day" + (place.farm ? ",soil_temperature_6cm" : ""),
+      daily: "temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_gusts_10m_max,sunrise,sunset,daylight_duration,uv_index_max" + (place.farm ? ",et0_fao_evapotranspiration" : "")
     })),
     models: "https://api.open-meteo.com/v1/forecast?" + qs(Object.assign({}, common, {
       forecast_days: 8, daily: "temperature_2m_max,temperature_2m_min,precipitation_sum",
@@ -221,7 +226,7 @@
       dew: pick("dew_point_2m", i), pop: pick("precipitation_probability", i), mm: pick("precipitation", i) || 0,
       cloud: pick("cloud_cover", i), vis: pick("visibility", i), wind: pick("wind_speed_10m", i),
       dir: pick("wind_direction_10m", i), gust: pick("wind_gusts_10m", i), uv: pick("uv_index", i),
-      code: pick("weather_code", i), isDay: pick("is_day", i)
+      code: pick("weather_code", i), isDay: pick("is_day", i), soilT: pick("soil_temperature_6cm", i)
     })).filter(x => x.temp != null);
 
     H.forEach(x => {
@@ -302,6 +307,7 @@
         uvFrom: uvHrs.length ? uvHrs[0].hr : null, uvTo: uvHrs.length ? uvHrs[uvHrs.length - 1].hr + 1 : null,
         sunrise: dl.sunrise ? dl.sunrise[i] : null, sunset: dl.sunset ? dl.sunset[i] : null,
         daylight: dl.daylight_duration ? dl.daylight_duration[i] : null,
+        et0: dl.et0_fao_evapotranspiration ? dl.et0_fao_evapotranspiration[i] : null,
         fogHrs: hrs.filter(x => x.fog && x.hr <= 10).length,
         frostHrs: hrs.filter(x => x.frost && x.hr <= 9).length,
         ens: ensDay[date] || null, models: modelDay[date] || []
@@ -390,7 +396,8 @@
     const brightDry = dryDays.filter(d => d.cloud != null && d.cloud < 65);
     if (brightDry.length) {
       const best = brightDry.slice().sort((a, b) => (a.cloud - b.cloud) || (b.hi - a.hi))[0];
-      out.push(cap(best.name) + " looks the best day, dry and " + best.sky.prose + " with a high of " + r0(best.hi) + "°C.");
+      const dryProse = best.sky.wet ? sky(0, 0, best.cloud, false).prose : best.sky.prose;
+      out.push(cap(best.name) + " looks the best day, dry and " + dryProse + " with a high of " + r0(best.hi) + "°C.");
     } else if (dryDays.length) {
       out.push(listJoin(dryDays.map(d => d.name)) + (dryDays.length > 1 ? " look" : " looks") + " dry but cloudy.");
     }
@@ -1098,6 +1105,114 @@
       '<p class="small">On Mauao the summit sits 232 m above the base track, so expect it to be a degree or two cooler and breezier at the top.</p></div>';
   }
 
+
+  /* ---------- farm ---------- */
+  // Each night runs from 6pm to 8am the next morning, labelled by the evening it starts.
+  function nights(S) {
+    const out = [];
+    for (let k = S.ti; k < S.ti + 7 && k + 1 < S.days.length; k++) {
+      const d = S.days[k], nx = S.days[k + 1];
+      const rs = S.H.filter(x => (x.date === d.date && x.hr >= 18) || (x.date === nx.date && x.hr <= 8));
+      if (!rs.length) continue;
+      const feels = minOf(rs.map(x => x.feels != null ? x.feels : x.temp));
+      const low = minOf(rs.map(x => x.temp));
+      const mm = sum(rs.map(x => x.mm));
+      const wind = maxOf(rs.map(x => x.wind)), gust = maxOf(rs.map(x => x.gust));
+      const frost = rs.some(x => x.frost && x.hr <= 9 && x.date === nx.date);
+      const sev = mm * 0.6 + Math.max(0, (wind || 0) - 15) * 0.4 + Math.max(0, 8 - feels) * 2 + (frost ? 4 : 0);
+      out.push({ d, nx, rs, feels, low, mm, wind, gust, dir: meanDir(rs), frost, sev });
+    }
+    return out;
+  }
+  const nightName = (S, n) => n.d.i === S.ti ? "Tonight" : n.d.name + " night";
+  const nightRef = (S, n) => n.d.i === S.ti ? "tonight" : n.d.name + " night";
+
+  function writeFarm(S, ns) {
+    const out = [];
+    const worst = ns.slice().sort((a, b) => b.sev - a.sev)[0];
+    if (worst && worst.sev >= 6) {
+      const bits = [];
+      if (worst.mm >= 1) bits.push(r0(worst.mm) + " mm of rain");
+      if ((worst.wind || 0) >= 15) bits.push("a " + dirLong(worst.dir) + " up to " + r0(worst.wind) + " km/h");
+      bits.push("a feels-like low of " + r0(worst.feels) + "°C");
+      out.push("The roughest night for mares and foals is " + nightRef(S, worst) + ", with " + listJoin(bits) + ".");
+    } else if (ns.length) {
+      let line = "Nights stay mild for mares and foals this week, with lows of " + r0(minOf(ns.map(n => n.low))) + "–" + r0(maxOf(ns.map(n => n.low))) + "°C";
+      if (worst && (worst.mm >= 3 || (worst.wind || 0) >= 18)) {
+        const bits = [];
+        if (worst.mm >= 1) bits.push(r0(worst.mm) + " mm of rain");
+        if ((worst.wind || 0) >= 15) bits.push("a " + dirLong(worst.dir) + " up to " + r0(worst.wind) + " km/h");
+        line += ". The wettest and windiest is " + nightRef(S, worst) + ", with " + listJoin(bits) + ", but it stays mild";
+      }
+      out.push(line + ".");
+    }
+    const frosts = ns.filter(n => n.frost);
+    if (frosts.length) out.push("Frost is possible on the morning after " + listJoin(frosts.map(n => nightRef(S, n))) + ".");
+    const soil = avg(S.H.filter(x => x.date === S.todayDate).map(x => x.soilT));
+    const soilAhead = avg(S.H.filter(x => x.n > S.nowN && x.n <= S.nowN + 168).map(x => x.soilT));
+    if (soil != null) {
+      let line = "Soil at 6 cm is about " + r0(soil) + "°C";
+      if (soilAhead != null && Math.abs(soilAhead - soil) >= 1.5) line += ", " + (soilAhead > soil ? "warming" : "cooling") + " to around " + r0(soilAhead) + "°C over the week";
+      line += soil >= 10 ? ", warm enough for good grass growth" : soil >= 6 ? ", so grass is growing but slowly" : ", too cold for much grass growth";
+      out.push(line + ".");
+    }
+    const past = S.days.slice(Math.max(0, S.ti - 7), S.ti), ahead = S.days.slice(S.ti, S.ti + 7);
+    const pr = sum(past.map(d => d.mm)), pe = sum(past.map(d => d.et0)), ar = sum(ahead.map(d => d.mmMid != null ? d.mmMid : d.mm)), ae = sum(ahead.map(d => d.et0));
+    if (pe > 0) {
+      const trendPast = pr - pe < -5 ? "drying" : pr - pe > 5 ? "getting wetter" : "holding about level";
+      const trendAhead = ar - ae < -5 ? "keep drying" : ar - ae > 5 ? "get wetter" : "stay about where they are";
+      out.push("Paddocks have been " + trendPast + ", with " + r0(pr) + " mm of rain in the past week against about " + r0(pe) + " mm lost to evaporation. The coming week brings around " + r0(ar) + " mm against " + r0(ae) + " mm, so they should " + trendAhead + ".");
+    }
+    const dryRun = [];
+    for (const d of ahead) { if (d.mmMid < 0.5 && d.mm < 0.5) dryRun.push(d); else if (dryRun.length) break; }
+    if (dryRun.length >= 2) out.push("The best dry spell for paddock work is " + (dryRun.length === 2 ? listJoin(dryRun.map(d => d.i === S.ti ? "today" : d.i === S.ti + 1 ? "tomorrow" : d.name)) : (dryRun[0].i === S.ti ? "today" : dryRun[0].name) + " through " + dryRun[dryRun.length - 1].name) + ".");
+    return out;
+  }
+
+  function renderFarm() {
+    const ns = nights(S);
+    const lines = writeFarm(S, ns);
+    $("farmRead").innerHTML = lines.length ? '<p class="lead">' + esc(lines[0]) + "</p>" + (lines.length > 1 ? "<p>" + esc(lines.slice(1).join(" ")) + "</p>" : "") : "";
+    const rough = ns.length ? ns.slice().sort((a, b) => b.sev - a.sev)[0] : null;
+    const rows = ns.map(n => {
+      const note = [];
+      if (n.frost) note.push("Frost risk");
+      if (n === rough && n.sev >= 6) note.push("Roughest night");
+      return "<tr" + (n === rough && n.sev >= 6 ? ' class="rough"' : "") + '><td class="part">' + nightName(S, n) + '</td><td class="n">' + r0(n.low) + "°</td>" +
+        '<td class="n">' + r0(n.feels) + "°</td>" +
+        '<td class="n">' + (n.mm < 0.2 ? "Dry" : n.mm < 1 ? "<1 mm" : r0(n.mm) + " mm") + "</td>" +
+        "<td>" + ((n.wind || 0) < 6 ? "Light" : dir16(n.dir) + " " + r0(n.wind) + ", gusts " + r0(n.gust)) + "</td>" +
+        "<td>" + note.join(", ") + "</td></tr>";
+    }).join("");
+    $("farmNights").innerHTML = '<h3>Nights for mares and foals</h3><div class="tablewrap"><table><thead><tr><th>6pm to 8am</th><th class="n">Low</th><th class="n">Feels like</th><th class="n">Rain</th><th>Wind (km/h)</th><th></th></tr></thead><tbody>' + rows + "</tbody></table></div>";
+    renderWater();
+  }
+
+  // Rain in against evaporation out, for the past week and the week ahead.
+  function renderWater() {
+    const past = S.days.slice(Math.max(0, S.ti - 7), S.ti), ahead = S.days.slice(S.ti, S.ti + 7);
+    const all = past.concat(ahead);
+    const W = 600, H = 220, L = 34, R = 10, T = 16, B = 30;
+    const rain = d => d.i >= S.ti && d.mmMid != null ? d.mmMid : d.mm;
+    const top = Math.max(5, Math.ceil(maxOf(all.map(rain)) / 5) * 5), bot = Math.max(5, Math.ceil(maxOf(all.map(d => d.et0 || 0)) / 5) * 5);
+    const y0 = T + (H - T - B) * top / (top + bot);
+    const sy = v => y0 - v / (top + bot) * (H - T - B);
+    const bw = (W - L - R) / all.length;
+    let g = '<svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Rain and evaporation each day, past week and week ahead">';
+    [top, 0, -bot].forEach(v => { g += '<line class="wgrid" x1="' + L + '" x2="' + (W - R) + '" y1="' + sy(v) + '" y2="' + sy(v) + '"/><text x="' + (L - 6) + '" y="' + (sy(v) + 3.5) + '" text-anchor="end">' + Math.abs(v) + "</text>"; });
+    const xs = L + past.length * bw;
+    g += '<line class="wtoday" x1="' + xs + '" x2="' + xs + '" y1="' + T + '" y2="' + (H - B + 4) + '"/><text x="' + (xs + 4) + '" y="' + (T + 8) + '">week ahead</text><text x="' + (xs - 4) + '" y="' + (T + 8) + '" text-anchor="end">past week</text>';
+    all.forEach((d, k) => {
+      const x = L + k * bw + bw * 0.2, w = bw * 0.6, r = rain(d), e = d.et0 || 0;
+      if (r >= 0.1) g += '<rect class="wrain" x="' + x + '" y="' + sy(r) + '" width="' + w + '" height="' + Math.max(1, sy(0) - sy(r)) + '" rx="2"><title>' + d.name + ": " + r.toFixed(1) + " mm rain</title></rect>";
+      if (e > 0) g += '<rect class="wevap" x="' + x + '" y="' + sy(0) + '" width="' + w + '" height="' + Math.max(1, sy(-e) - sy(0)) + '" rx="2"><title>' + d.name + ": " + e.toFixed(1) + " mm evaporation</title></rect>";
+      g += '<text x="' + (L + k * bw + bw / 2) + '" y="' + (H - 10) + '" text-anchor="middle">' + (d.i === S.ti ? "Tod" : d.name.slice(0, 2)) + "</text>";
+    });
+    g += "</svg>";
+    $("farmWater").innerHTML = '<h3>Rain in, evaporation out</h3>' + g +
+      '<p class="small"><span class="key keyrain"></span>Rain, mm above the line. <span class="key keyevap"></span>Water lost to evaporation, mm below it. The week ahead uses the middle of the model estimates.</p>';
+  }
+
   function hideTip() { tip.hidden = true; if (geo) geo.cross.setAttribute("visibility", "hidden"); }
 
   function move(ev) {
@@ -1157,6 +1272,7 @@
     document.body.classList.toggle("finder", !!PLACE.finder);
     if ($("findersec")) $("findersec").hidden = !PLACE.finder;
     $("beachsec").hidden = !PLACE.beach;
+    $("farmsec").hidden = !PLACE.farm;
     document.body.classList.toggle("coast", !!PLACE.coast);
     document.body.classList.toggle("has-tide", !!PLACE.tides);
     document.body.classList.toggle("has-wave", !!PLACE.marine);
@@ -1172,6 +1288,7 @@
     renderRead();
     if (PLACE.golf) renderGolf();
     if (PLACE.beach) renderBeach();
+    if (PLACE.farm) renderFarm();
     renderLedger();
     renderChart();
     renderDay();
