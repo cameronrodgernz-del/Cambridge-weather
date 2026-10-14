@@ -58,4 +58,4 @@ Add an entry to `PLACES` at the top of `app.js` (name, region, latitude, longitu
 
 Weather data from [Open-Meteo](https://open-meteo.com/) under CC BY 4.0. Open-Meteo's free service is for non-commercial use. If the site is ever used commercially, it needs an Open-Meteo API subscription.
 
-Fog risk is flagged for night and early-morning hours when the air is close to saturation (temperature within 1°C of the dew point) and winds are light, or when the models show visibility under 1 km. Frost risk is flagged when the temperature is 1°C or below, or 3.5°C or below under clear, calm skies.
+Fog risk is flagged for night and early-morning hours when the air is close to saturation (temperature within 1°C of the dew point) and winds are light, or when the models show visibility under 1 km. Frost risk is flagged when the temperature is 1°C or below, or 3.5°C or below under clear, calm skies. On the coast (Mount Maunganui and Wellington) the sea keeps things warmer, so there it takes 2°C or below under clear, calm skies, or 1°C or below in any conditions.

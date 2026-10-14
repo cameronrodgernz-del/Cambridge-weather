@@ -245,7 +245,10 @@
       const darkish = x.hr >= 20 || x.hr <= 10;
       // inland valleys fog on calm, near-saturated nights; on the coast the air sits near saturation most nights, so rely on the models' visibility
       x.fog = darkish && x.mm < 0.2 && ((x.vis != null && x.vis <= 1000) || (!PLACE.coast && spread <= 1.0 && (x.wind == null ? 99 : x.wind) <= 7));
-      x.frost = x.temp <= 1 || (x.temp <= 3.5 && (x.cloud == null ? 100 : x.cloud) <= 40 && (x.wind == null ? 99 : x.wind) <= 8);
+      // the sea keeps the coast a few degrees warmer than the model's grid, so coastal places need a colder reading before frost is flagged
+      x.frost = PLACE.coast
+        ? x.temp <= 1 || (x.temp <= 2 && (x.cloud == null ? 100 : x.cloud) <= 40 && (x.wind == null ? 99 : x.wind) <= 8)
+        : x.temp <= 1 || (x.temp <= 3.5 && (x.cloud == null ? 100 : x.cloud) <= 40 && (x.wind == null ? 99 : x.wind) <= 8);
     });
 
     H.forEach(x => { x.play = playScore(x); });
