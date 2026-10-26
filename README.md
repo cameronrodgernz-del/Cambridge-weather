@@ -24,7 +24,7 @@ Each daylight hour scores out of 100 and loses points for rain (more for heavier
 
 ## Mount Maunganui
 
-The third tab, with its own link `/mount`. The hourly chart swaps the fog and frost strip for the tide curve (LINZ predictions for Tauranga, bundled in `tides-tauranga.js` for 2026 and 2027) and a waves panel from the Open-Meteo marine model. An "At the beach" section gives the next tides, wave size and direction, the cleanest mornings for a surf (light or offshore winds, which at Main Beach come from the south round to the west), sea temperature, and tide and swell tables. The tide file needs a new year of LINZ predictions added before the end of 2027.
+The third tab, with its own link `/mount`. It opens with "The Mount right now": the Port of Tauranga's Mauao camera, a still picture the page reloads every two minutes, and a switch to Astrolabe's live video of Main Beach, which only loads when it's picked. The cameras are set in the `cams` list on the `mount` entry in `PLACES`, so another tab can have its own by adding the same list. The hourly chart swaps the fog and frost strip for the tide curve (LINZ predictions for Tauranga, bundled in `tides-tauranga.js` for 2026 and 2027) and a waves panel from the Open-Meteo marine model. An "At the beach" section gives the next tides, wave size and direction, the cleanest mornings for a surf (light or offshore winds, which at Main Beach come from the south round to the west), sea temperature, and tide and swell tables. The tide file needs a new year of LINZ predictions added before the end of 2027.
 
 ## Tee times
 

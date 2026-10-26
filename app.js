@@ -23,7 +23,26 @@
     mount: {
       key: "mount", name: "Mount Maunganui", title: "Mount Maunganui Weather", region: "Bay of Plenty",
       lat: -37.6330, lon: 176.1800, path: "/mount", coast: true, tides: "tauranga", tideLabel: "Tauranga", marine: true, beach: true,
-      metservice: "https://www.metservice.com/towns-cities/locations/mount-maunganui", metserviceName: "Mount Maunganui"
+      metservice: "https://www.metservice.com/towns-cities/locations/mount-maunganui", metserviceName: "Mount Maunganui",
+      // Cameras shown at the top of the tab. A "still" is a picture the page reloads every few minutes;
+      // a "video" is a live player that only loads when someone picks it.
+      cams: [
+        {
+          key: "mauao", label: "Mauao", kind: "still", every: 2,
+          src: "https://www.port-tauranga.co.nz/cameras/mauao.jpg",
+          alt: "Mauao from the Port of Tauranga camera",
+          note: "Looking across the harbour to Mauao from the Port of Tauranga. The page checks for a new picture every two minutes, and the time the camera took it is in the top corner.",
+          down: "The Port's camera isn't responding right now. It usually comes back within a few minutes.",
+          link: "https://www.port-tauranga.co.nz/operations/web-cams/", linkLabel: "Port of Tauranga cameras"
+        },
+        {
+          key: "beach", label: "Main Beach live", kind: "video",
+          src: "https://rtsp.me/embed/Rfnzes7R/",
+          title: "Mount Main Beach live camera",
+          note: "Live video of Mount Main Beach from Astrolabe. Press play to start it. The player stops after ten minutes, so press play again to keep watching.",
+          link: "https://astrolabe.co.nz/live-surf-cam/", linkLabel: "Astrolabe's surf cam page"
+        }
+      ]
     },
     wellington: {
       key: "wellington", name: "Wellington", title: "Wellington Weather", region: "Wellington, New Zealand",
@@ -1120,6 +1139,77 @@
   }
 
 
+  /* ---------- cameras ---------- */
+  // Set up once per place, apart from the forecast, so a forecast refresh never restarts a video.
+  let camPlace = null, camKey = null, camTimer = null;
+  const stopCamTimer = () => { if (camTimer) { clearInterval(camTimer); camTimer = null; } };
+  const camUrl = c => c.src + (c.src.indexOf("?") < 0 ? "?" : "&") + "t=" + Math.floor(Date.now() / 60000);
+  const camNow = () => (PLACE.cams || []).find(x => x.key === camKey);
+
+  // Fetch the next picture off screen and only swap it in once it has arrived, so the frame never goes blank.
+  function loadStill(c) {
+    const pic = new Image(), url = camUrl(c), place = PLACE;
+    pic.onload = () => {
+      if (place !== PLACE || camKey !== c.key) return;
+      const img = $("camImg");
+      if (!img) return;
+      img.src = url;
+      img.hidden = false;
+      const w = $("camWait"); if (w) w.hidden = true;
+      const d = $("camDown"); if (d) d.hidden = true;
+    };
+    pic.onerror = () => {
+      if (place !== PLACE || camKey !== c.key) return;
+      const img = $("camImg");
+      if (img && img.hidden) { const w = $("camWait"); if (w) w.textContent = c.down || "The camera isn't responding right now."; }
+      else { const d = $("camDown"); if (d) d.hidden = false; }
+    };
+    pic.src = url;
+  }
+
+  function showCam(key) {
+    const cams = PLACE.cams || [];
+    const c = cams.find(x => x.key === key) || cams[0];
+    if (!c) return;
+    stopCamTimer();
+    camKey = c.key;
+    document.querySelectorAll("#camSeg button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.cam === c.key)));
+    const frame = $("camFrame");
+    if (c.kind === "video") {
+      frame.innerHTML = '<iframe src="' + esc(c.src) + '" title="' + esc(c.title || c.label) + '" allow="autoplay; fullscreen"></iframe>';
+    } else {
+      frame.innerHTML = '<img id="camImg" alt="' + esc(c.alt || c.label) + '" width="640" height="360" hidden><p class="camwait" id="camWait">Loading the camera.</p>';
+      loadStill(c);
+      camTimer = setInterval(() => { if (!document.hidden) loadStill(c); }, (c.every || 2) * 60000);
+    }
+    $("camNote").innerHTML = "<p>" + esc(c.note) + "</p>" +
+      (c.down ? '<p class="camdown" id="camDown" hidden>' + esc(c.down) + "</p>" : "") +
+      (c.link ? '<p><a href="' + esc(c.link) + '" target="_blank" rel="noopener">' + esc(c.linkLabel || "Camera page") + "</a></p>" : "");
+  }
+
+  function setupCams() {
+    if (camPlace === PLACE) return;
+    camPlace = PLACE;
+    stopCamTimer();
+    camKey = null;
+    const cams = PLACE.cams || [];
+    $("camsec").hidden = !cams.length;
+    $("camFrame").innerHTML = "";   // leaving a tab drops any video that was playing
+    if (!cams.length) return;
+    $("camSeg").innerHTML = cams.map(c => '<button type="button" data-cam="' + esc(c.key) + '" aria-pressed="false">' + esc(c.label) + "</button>").join("");
+    $("camSeg").hidden = cams.length < 2;
+    showCam(cams[0].key);
+  }
+  $("camSeg").addEventListener("click", ev => {
+    const b = ev.target.closest("button[data-cam]");
+    if (b && b.dataset.cam !== camKey) showCam(b.dataset.cam);
+  });
+  document.addEventListener("visibilitychange", () => {
+    const c = camNow();
+    if (!document.hidden && c && c.kind === "still") loadStill(c);
+  });
+
+
   /* ---------- farm ---------- */
   // Each night runs from 6pm to 8am the next morning, labelled by the evening it starts.
   function nights(S) {
@@ -1292,6 +1382,7 @@
     document.body.classList.toggle("has-wave", !!PLACE.marine);
     if ($("tee")) $("tee").setAttribute("aria-label", "Golf conditions by hour for the next seven days at " + PLACE.name);
     document.querySelectorAll("#placeSeg button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.place === PLACE.key)));
+    setupCams();
   }
 
   function renderAll() {
