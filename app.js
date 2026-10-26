@@ -31,7 +31,7 @@
           key: "mauao", label: "Mauao", kind: "still", every: 2,
           src: "https://www.port-tauranga.co.nz/cameras/mauao.jpg",
           alt: "Mauao from the Port of Tauranga camera",
-          note: "Looking across the harbour to Mauao from the Port of Tauranga. The page checks for a new picture every two minutes, and the time the camera took it is in the top corner.",
+          note: "Looking across the harbour to Mauao from the Port of Tauranga. The Port posts a new picture about every 15 minutes, and the time it was taken is in the top corner.",
           down: "The Port's camera isn't responding right now. It usually comes back within a few minutes.",
           link: "https://www.port-tauranga.co.nz/operations/web-cams/", linkLabel: "Port of Tauranga cameras"
         },
