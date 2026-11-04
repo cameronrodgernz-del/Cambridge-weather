@@ -46,9 +46,22 @@ Tab `/royal-auckland`, for Royal Auckland and Grange Golf Club at 57 Grange Road
 
 Tab `/rich-hill`, for the farm at 570 Landsdowne Road, Walton. It has the full weather page plus an "On the farm" section: the roughest night of the week for mares and foals (rain, wind and feels-like low, 6pm to 8am), frost mornings, soil temperature at 6 cm for grass growth, whether paddocks are drying or getting wetter (rain against evaporation for the past week and the week ahead), and the best dry spell for paddock work.
 
+## Te Rapa Racecourse
+
+Tab `/te-rapa`, for the racecourse on Ken Browne Drive, Hamilton, built for the people who look after the track. The code is in `track.js`; the place, its race dates and the direction of the home straight are on the `terapa` entry in `PLACES`. On top of the full weather page it has:
+
+- **Next meeting**: a written read of race day, then a drawing of rain each hour and the running total from now to the end of racing, with the 48 hour, 24 hour and 6:45am race-morning checks marked and thunderstorm hours flagged. Below it, racing hours hour by hour with the wind as the horses meet it in the straight (headwind, tailwind or crosswind from the inside or outside rail), the rain expected between each check and the next, and the last seven days' rain and evaporation for the track information sheet. Meetings more than a week out show the date until the forecast reaches them.
+- **The rest of the season**: the remaining meetings, how far away they are and the break before each.
+- **Rain radar**: the last two hours of RainViewer radar in ten-minute steps on a greyed OpenStreetMap base, with rings at 25 and 50 km. RainViewer's free feed stops at zoom 7, so the radar tiles are drawn at twice their size on a zoom 8 map.
+- **On the track**: whether the track should wet up or dry out this week, the water lost to evaporation since the last day with 5 mm or more, the rain in and evaporation out chart, soil moisture in the top 9 cm and from 9 to 27 cm, soil temperature for growth and oversowing, and a seven-day grid of thunderstorm hours and downpours of 5 mm or more in an hour.
+
+Racing hours are taken as 11am to 6pm unless a meeting in the list says otherwise (`from` and `to`). The race dates come from the NZTR 2026–27 calendar on loveracing.nz and need the 2027–28 dates added before August 2027. The home straight bearing (336°, running north-north-west to the post) comes from the OpenStreetMap outline of the track.
+
+Soil moisture, soil temperature and evaporation come from the Open-Meteo model for the area, not from the track. Te Rapa is sand-slitted and drains faster than the soil around it, so the page uses them for direction rather than as readings.
+
 ## Hosting
 
-It's a plain static site: `index.html`, `styles.css`, `app.js`. No build step and no keys. On Vercel, import the GitHub repository and deploy with the default settings (Framework preset: Other).
+It's a plain static site: `index.html`, `styles.css`, `app.js`, with `finder.js` for the tee times tab and `track.js` for the racecourse. No build step and no keys. On Vercel, import the GitHub repository and deploy with the default settings (Framework preset: Other).
 
 ## Making a copy for another town
 
@@ -56,6 +69,6 @@ Add an entry to `PLACES` at the top of `app.js` (name, region, latitude, longitu
 
 ## Data
 
-Weather data from [Open-Meteo](https://open-meteo.com/) under CC BY 4.0. Open-Meteo's free service is for non-commercial use. If the site is ever used commercially, it needs an Open-Meteo API subscription.
+Weather data from [Open-Meteo](https://open-meteo.com/) under CC BY 4.0. Open-Meteo's free service is for non-commercial use. If the site is ever used commercially, it needs an Open-Meteo API subscription. The same goes for the [RainViewer](https://www.rainviewer.com/api.html) radar, which is free for personal use with credit, and the [OpenStreetMap](https://operations.osmfoundation.org/policies/tiles/) map tiles, which are fine for light use with credit.
 
 Fog risk is flagged for night and early-morning hours when the air is close to saturation (temperature within 1°C of the dew point) and winds are light, or when the models show visibility under 1 km. Frost risk is flagged when the temperature is 1°C or below, or 3.5°C or below under clear, calm skies. On the coast (Mount Maunganui and Wellington) the sea keeps things warmer, so there it takes 2°C or below under clear, calm skies, or 1°C or below in any conditions.

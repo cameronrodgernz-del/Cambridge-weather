@@ -73,6 +73,36 @@
       lat: -37.7440, lon: 175.7040, path: "/rich-hill", farm: true,
       metservice: "https://www.metservice.com/towns-cities/locations/matamata", metserviceName: "Matamata"
     },
+    terapa: {
+      key: "terapa", name: "Te Rapa Racecourse", title: "Te Rapa Racecourse Weather", region: "Hamilton, Waikato",
+      lat: -37.7662, lon: 175.2463, path: "/te-rapa", track: true, radar: true,
+      metservice: "https://www.metservice.com/towns-cities/locations/hamilton", metserviceName: "Hamilton",
+      // The home straight runs north-north-west to the winning post (bearing about 336°, from the OpenStreetMap outline
+      // of the track, with the stands on the Te Rapa Road side). Used for headwinds and tailwinds in the straight.
+      straight: 336,
+      // Racing hours are taken as 11am to 6pm unless a meeting says otherwise (from/to are clock hours).
+      // Dates from the NZTR calendar on loveracing.nz for the 2026–27 season. Add the next season's dates before August 2027.
+      meetings: [
+        { date: "2026-08-22" },
+        { date: "2026-09-13" },
+        { date: "2026-09-25" },
+        { date: "2026-10-26" },
+        { date: "2026-11-07" },
+        { date: "2026-12-12", name: "Waikato Cup Day" },
+        { date: "2026-12-19" },
+        { date: "2027-01-15" },
+        { date: "2027-01-29" },
+        { date: "2027-02-06", name: "Waikato Sprint Day" },
+        { date: "2027-04-11" },
+        { date: "2027-04-24" },
+        { date: "2027-05-01" },
+        { date: "2027-05-23" },
+        { date: "2027-05-29" },
+        { date: "2027-06-12" },
+        { date: "2027-07-03" },
+        { date: "2027-07-24", name: "Taumarunui Racing Club" }
+      ]
+    },
     golf: {
       key: "golf", name: "Tee times", title: "Waikato Tee Times", region: "Golf within 50 minutes of Cambridge",
       path: "/golf", finder: true,
@@ -104,12 +134,14 @@
   const qs = o => Object.entries(o).map(([k, v]) => k + "=" + encodeURIComponent(v)).join("&");
   function urlsFor(place) {
   const common = { latitude: place.lat, longitude: place.lon, timezone: TIMEZONE };
+  // the racecourse also needs soil readings and evaporation by the hour, and two weeks back to find the last decent rain
+  const trackHourly = ",soil_temperature_6cm,soil_temperature_18cm,soil_moisture_0_to_1cm,soil_moisture_1_to_3cm,soil_moisture_3_to_9cm,soil_moisture_9_to_27cm,et0_fao_evapotranspiration";
   return {
     main: "https://api.open-meteo.com/v1/forecast?" + qs(Object.assign({}, common, {
-      forecast_days: 8, past_days: 7, wind_speed_unit: "kmh",
+      forecast_days: 8, past_days: place.track ? 14 : 7, wind_speed_unit: "kmh",
       current: "temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m,wind_gusts_10m,is_day",
-      hourly: "temperature_2m,apparent_temperature,relative_humidity_2m,dew_point_2m,precipitation_probability,precipitation,cloud_cover,visibility,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index,weather_code,is_day" + (place.farm ? ",soil_temperature_6cm" : ""),
-      daily: "temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_gusts_10m_max,sunrise,sunset,daylight_duration,uv_index_max" + (place.farm ? ",et0_fao_evapotranspiration" : "")
+      hourly: "temperature_2m,apparent_temperature,relative_humidity_2m,dew_point_2m,precipitation_probability,precipitation,cloud_cover,visibility,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index,weather_code,is_day" + (place.track ? trackHourly : place.farm ? ",soil_temperature_6cm" : ""),
+      daily: "temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_gusts_10m_max,sunrise,sunset,daylight_duration,uv_index_max" + (place.farm || place.track ? ",et0_fao_evapotranspiration" : "")
     })),
     models: "https://api.open-meteo.com/v1/forecast?" + qs(Object.assign({}, common, {
       forecast_days: 8, daily: "temperature_2m_max,temperature_2m_min,precipitation_sum",
@@ -256,7 +288,12 @@
       dew: pick("dew_point_2m", i), pop: pick("precipitation_probability", i), mm: pick("precipitation", i) || 0,
       cloud: pick("cloud_cover", i), vis: pick("visibility", i), wind: pick("wind_speed_10m", i),
       dir: pick("wind_direction_10m", i), gust: pick("wind_gusts_10m", i), uv: pick("uv_index", i),
-      code: pick("weather_code", i), isDay: pick("is_day", i), soilT: pick("soil_temperature_6cm", i)
+      code: pick("weather_code", i), isDay: pick("is_day", i), soilT: pick("soil_temperature_6cm", i),
+      soilT18: pick("soil_temperature_18cm", i), et0: pick("et0_fao_evapotranspiration", i),
+      // soil moisture as a share of the soil's volume: the top 9 cm (weighted by layer depth) and 9 to 27 cm
+      smTop: h.soil_moisture_3_to_9cm && pick("soil_moisture_0_to_1cm", i) != null && pick("soil_moisture_1_to_3cm", i) != null && pick("soil_moisture_3_to_9cm", i) != null
+        ? (pick("soil_moisture_0_to_1cm", i) + 2 * pick("soil_moisture_1_to_3cm", i) + 6 * pick("soil_moisture_3_to_9cm", i)) / 9 : null,
+      smRoot: pick("soil_moisture_9_to_27cm", i)
     })).filter(x => x.temp != null);
 
     H.forEach(x => {
@@ -1292,8 +1329,11 @@
     renderWater();
   }
 
-  // Rain in against evaporation out, for the past week and the week ahead.
+  // Rain in against evaporation out, for the past week and the week ahead. Shared with the racecourse page.
   function renderWater() {
+    $("farmWater").innerHTML = '<h3>Rain in, evaporation out</h3>' + waterChart(S);
+  }
+  function waterChart(S) {
     const past = S.days.slice(Math.max(0, S.ti - 7), S.ti), ahead = S.days.slice(S.ti, S.ti + 7);
     const all = past.concat(ahead);
     const W = 600, H = 220, L = 34, R = 10, T = 16, B = 30;
@@ -1313,7 +1353,7 @@
       g += '<text x="' + (L + k * bw + bw / 2) + '" y="' + (H - 10) + '" text-anchor="middle">' + (d.i === S.ti ? "Tod" : d.name.slice(0, 2)) + "</text>";
     });
     g += "</svg>";
-    $("farmWater").innerHTML = '<h3>Rain in, evaporation out</h3>' + g +
+    return '<div class="waterchart">' + g + "</div>" +
       '<p class="small"><span class="key keyrain"></span>Rain, mm above the line. <span class="key keyevap"></span>Water lost to evaporation, mm below it. The week ahead uses the middle of the model estimates.</p>';
   }
 
@@ -1377,6 +1417,9 @@
     if ($("findersec")) $("findersec").hidden = !PLACE.finder;
     $("beachsec").hidden = !PLACE.beach;
     $("farmsec").hidden = !PLACE.farm;
+    $("racesec").hidden = !PLACE.track;
+    $("tracksec").hidden = !PLACE.track;
+    if (window.Track) window.Track.setup(PLACE);
     document.body.classList.toggle("coast", !!PLACE.coast);
     document.body.classList.toggle("has-tide", !!PLACE.tides);
     document.body.classList.toggle("has-wave", !!PLACE.marine);
@@ -1394,6 +1437,7 @@
     if (PLACE.golf) renderGolf();
     if (PLACE.beach) renderBeach();
     if (PLACE.farm) renderFarm();
+    if (PLACE.track && window.Track) window.Track.render(S, PLACE);
     renderLedger();
     renderChart();
     renderDay();
@@ -1457,6 +1501,7 @@
   window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => {
     if (PLACE.finder) { if (window.Finder) window.Finder.resize(); return; }
     if (S) { hideTip(); hideTeeTip(); renderChart(); if (PLACE.golf) renderTee(); }
+    if (PLACE.track && window.Track) window.Track.resize();
   }, 150); });
   document.addEventListener("visibilitychange", () => {
     if (document.hidden || window.WX_SNAPSHOT || Date.now() - lastLoad <= REFRESH_MINUTES * 60000) return;
@@ -1466,8 +1511,10 @@
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => {
     if (PLACE.finder) { if (window.Finder) window.Finder.resize(); return; }
     if (S) { renderChart(); if (PLACE.golf) renderTee(); }
+    if (PLACE.track && window.Track) window.Track.resize();
   });
-  window.WXCORE = { tnum, fmtH, fmtClock, wd, dnum, mon, esc, cap, listJoin, dir16, dirLong, meanDir, playScore, playWord };
+  window.WXCORE = { tnum, fmtH, fmtClock, wd, dnum, mon, esc, cap, lc, listJoin, dir16, dirLong, meanDir, playScore, playWord,
+    r0, sum, avg, maxOf, minOf, mmText, amountText, amountPhrase, agrees, chanceWord, sky, waterChart, TIMEZONE };
   applyPlaceChrome();
   load();
 })();

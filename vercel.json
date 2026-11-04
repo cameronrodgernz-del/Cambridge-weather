@@ -28,6 +28,10 @@
     {
       "source": "/rich-hill",
       "destination": "/"
+    },
+    {
+      "source": "/te-rapa",
+      "destination": "/"
     }
   ],
   "headers": [

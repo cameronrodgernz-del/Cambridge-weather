@@ -22,6 +22,7 @@
   --tidefill: rgba(52, 85, 110, 0.12);
   --wave: #2B7A8C;
   --wavefill: rgba(43, 122, 140, 0.14);
+  --racing: rgba(23, 97, 79, 0.10);
   --display: "Bricolage Grotesque", "Public Sans", system-ui, sans-serif;
   --body: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
@@ -34,6 +35,7 @@
     --wind: #5CC0A3; --gust: rgba(92, 192, 163, 0.2); --cloud: #A7B8C8; --cloudfill: rgba(167, 184, 200, 0.14);
     --sun: #E8B53A; --select: #1B2D27;
     --tide: #A6C0D6; --tidefill: rgba(166, 192, 214, 0.14); --wave: #6FC3D3; --wavefill: rgba(111, 195, 211, 0.15);
+    --racing: rgba(92, 192, 163, 0.13);
     color-scheme: dark;
   }
 }
@@ -43,6 +45,7 @@
   --wind: #5CC0A3; --gust: rgba(92, 192, 163, 0.2); --cloud: #A7B8C8; --cloudfill: rgba(167, 184, 200, 0.14);
   --sun: #E8B53A; --select: #1B2D27;
   --tide: #A6C0D6; --tidefill: rgba(166, 192, 214, 0.14); --wave: #6FC3D3; --wavefill: rgba(111, 195, 211, 0.15);
+  --racing: rgba(92, 192, 163, 0.13);
   color-scheme: dark;
 }
 
@@ -138,7 +141,7 @@ section { display: flex; flex-direction: column; gap: 16px; }
 .seg.placeseg { align-self: flex-start; margin-bottom: 6px; flex-wrap: wrap; gap: 6px; border: 0; background: transparent; overflow: visible; border-radius: 0; }
 .placeseg button { border: 1px solid var(--rule) !important; border-radius: 6px; background: var(--surface); }
 .placeseg button { padding: 8px 14px; font-size: 13.5px; font-kerning: none; }
-body.is-loading .wrap > section:not(.read):not(#camsec), body.is-loading .now { opacity: 0.45; transition: opacity 0.2s; }
+body.is-loading .wrap > section:not(.read):not(#camsec):not(#radarsec), body.is-loading .now { opacity: 0.45; transition: opacity 0.2s; }
 
 /* cameras: picture on the left, name, switch and note on the right; stacked on phones */
 .camsec { display: grid; grid-template-columns: minmax(0, 640px) minmax(0, 1fr); grid-template-rows: auto 1fr;
@@ -233,16 +236,103 @@ body.finder .wrap > section:not(#findersec), body.finder .now { display: none !i
 .farmdetail { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 28px 48px; align-items: start; }
 .farmdetail .col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .farmdetail tr.rough td { font-weight: 600; }
-#farmWater svg { width: 100%; height: auto; display: block; }
-#farmWater svg text { font-family: var(--mono); font-size: 11px; fill: var(--muted); }
-#farmWater .wgrid { stroke: var(--rule); }
-#farmWater .wtoday { stroke: var(--faint); stroke-dasharray: 3 3; }
-#farmWater .wrain { fill: var(--rain); }
-#farmWater .wevap { fill: var(--temp); fill-opacity: 0.55; }
+.waterchart svg { width: 100%; height: auto; display: block; }
+.waterchart svg text { font-family: var(--mono); font-size: 11px; fill: var(--muted); }
+.waterchart .wgrid { stroke: var(--rule); }
+.waterchart .wtoday { stroke: var(--faint); stroke-dasharray: 3 3; }
+.waterchart .wrain { fill: var(--rain); }
+.waterchart .wevap { fill: var(--temp); fill-opacity: 0.55; }
 .key { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
 .keyrain { background: var(--rain); }
 .keyevap { background: var(--temp); opacity: 0.55; }
 @media (max-width: 860px) { .farmdetail { grid-template-columns: 1fr; } }
+
+/* racecourse: next meeting */
+#racesec .readtext, #tracksec .readtext { max-width: 74ch; }
+#raceChart, #stormGrid { display: block; }
+#raceChart text, #stormGrid text { font-family: var(--mono); font-size: 10px; fill: var(--muted); }
+#raceChart .dlabel { font-family: var(--display); font-size: 13px; font-weight: 700; fill: var(--ink); }
+#raceChart .clabel { font-family: var(--body); font-size: 11px; font-weight: 600; fill: var(--ink); }
+#raceChart .night { fill: var(--night); }
+#raceChart .racing { fill: var(--racing); stroke: var(--accent); stroke-width: 1; }
+#raceChart .grid { stroke: var(--rule); }
+#raceChart .daysep { stroke: var(--faint); stroke-dasharray: 2 3; }
+#raceChart .hbar { fill: var(--rain); }
+#raceChart .cum { fill: none; stroke: var(--ink); stroke-width: 2; stroke-linejoin: round; }
+#raceChart .cumv { fill: var(--ink); font-weight: 500; paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round; }
+#raceChart .cdot { fill: var(--ink); stroke: var(--surface); stroke-width: 2; }
+#raceChart .now { stroke: var(--ink); stroke-width: 1.5; }
+#raceChart .cross { stroke: var(--ink); stroke-width: 1; opacity: 0.55; }
+#raceChart .hit, #stormGrid .hit { fill: transparent; cursor: crosshair; }
+.chk { stroke: var(--ink); stroke-width: 1.4; stroke-dasharray: 3 2; }
+.thring { fill: var(--surface); stroke: var(--ink); stroke-width: 1.6; }
+.racedetail { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 28px 48px; align-items: start; }
+.racedetail .col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.racedetail td.n, .racedetail th.n { text-align: right; padding-right: 14px; }
+.racedetail td.past { color: var(--faint); }
+.racehours { min-width: 600px; }
+.racehours td { white-space: nowrap; }
+.checks { min-width: 430px; }
+.checks td.n { white-space: nowrap; }
+.racedetail tr.storm td:nth-child(2) { font-weight: 600; }
+#raceSeason { display: flex; flex-direction: column; gap: 12px; }
+#raceSeason td.n, #raceSeason th.n { text-align: right; padding-left: 12px; padding-right: 0; }
+#raceSeason .season { max-width: 720px; }
+.morebtn { align-self: flex-start; border: 1px solid var(--rule); background: var(--surface); border-radius: 6px; padding: 7px 14px; font-size: 13px; cursor: pointer; }
+#raceSeason tr.next td { font-weight: 600; }
+#raceSeason tr.gap td { color: var(--ink); }
+@media (max-width: 860px) { .racedetail { grid-template-columns: 1fr; } }
+
+/* racecourse: radar */
+.radarctl { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.radarbtn { border: 1px solid var(--rule); background: var(--surface); border-radius: 6px; padding: 6px 14px; font-size: 13px; cursor: pointer; min-width: 64px; }
+.radarctl input[type="range"] { width: 180px; accent-color: var(--accent); }
+.radartime { font-size: 12.5px; color: var(--ink); min-width: 15ch; }
+.radarmap { position: relative; height: 420px; overflow: hidden; border: 1px solid var(--rule); border-radius: 6px; background: #E9ECEA; touch-action: pan-y; }
+.radarmap img { position: absolute; display: block; max-width: none; user-select: none; -webkit-user-drag: none; pointer-events: none; }
+.rbase { position: absolute; inset: 0; filter: grayscale(1) contrast(0.92) brightness(1.04); opacity: 0.9; }
+.rframes { position: absolute; inset: 0; }
+.rframes > div { position: absolute; inset: 0; visibility: hidden; opacity: 0.85; }
+.rframes > div.on { visibility: visible; }
+.rover { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.rover .ring { fill: none; stroke: #13221D; stroke-width: 1.2; stroke-dasharray: 4 4; opacity: 0.55; }
+.rover .ringl { font-family: var(--mono); font-size: 10.5px; fill: #13221D; paint-order: stroke; stroke: rgba(255, 255, 255, 0.85); stroke-width: 3px; }
+.rover .pin { fill: #17614F; stroke: #FFFFFF; stroke-width: 2; }
+.rover .pinl { font-family: var(--body); font-size: 12.5px; font-weight: 700; fill: #13221D; paint-order: stroke; stroke: rgba(255, 255, 255, 0.9); stroke-width: 3.5px; }
+.radarwait { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; margin: 0; font-size: 13px; color: #56665F; text-align: center; padding: 16px; }
+.radarfoot { display: flex; flex-direction: column; gap: 6px; }
+.radarkey { padding: 0; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .rbase { filter: grayscale(1) invert(1) contrast(0.85) brightness(0.9); } :root:not([data-theme="light"]) .radarmap { background: #1A2421; } }
+:root[data-theme="dark"] .rbase { filter: grayscale(1) invert(1) contrast(0.85) brightness(0.9); }
+:root[data-theme="dark"] .radarmap { background: #1A2421; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .rover .ring { stroke: #E3ECE8; opacity: 0.6; }
+  :root:not([data-theme="light"]) .rover .ringl, :root:not([data-theme="light"]) .rover .pinl { fill: #E3ECE8; stroke: rgba(12, 21, 18, 0.9); }
+  :root:not([data-theme="light"]) .rover .pin { fill: #5CC0A3; stroke: #0C1512; }
+}
+:root[data-theme="dark"] .rover .ring { stroke: #E3ECE8; opacity: 0.6; }
+:root[data-theme="dark"] .rover .ringl, :root[data-theme="dark"] .rover .pinl { fill: #E3ECE8; stroke: rgba(12, 21, 18, 0.9); }
+:root[data-theme="dark"] .rover .pin { fill: #5CC0A3; stroke: #0C1512; }
+@media (max-width: 620px) { .radarmap { height: 340px; } .radarctl input[type="range"] { width: 130px; } }
+
+/* racecourse: on the track */
+.trackdetail { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px 48px; align-items: start; }
+.trackdetail .col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.soilchart svg { width: 100%; height: auto; display: block; }
+.soilchart svg text { font-family: var(--mono); font-size: 11px; fill: var(--muted); }
+.soilchart .sgrid { stroke: var(--rule); }
+.soilchart .stoday { stroke: var(--faint); stroke-dasharray: 3 3; }
+.soilchart .stop { fill: none; stroke: var(--rain); stroke-width: 2; stroke-linejoin: round; }
+.soilchart .sroot { fill: none; stroke: var(--ink); stroke-width: 1.6; stroke-dasharray: 5 3; }
+.keyline { display: inline-block; width: 16px; height: 0; border-top: 2px solid var(--rain); margin-right: 5px; vertical-align: 3px; }
+.keyline.dash { border-top: 1.6px dashed var(--ink); }
+.trackstorm { display: flex; flex-direction: column; gap: 14px; }
+#stormGrid .rl { font-family: var(--body); font-size: 12.5px; font-weight: 600; fill: var(--ink); }
+#stormGrid .dark { fill: var(--night); }
+#stormGrid .cellbg { fill: var(--surface); stroke: var(--rule); stroke-width: 0.6; }
+.scell { fill: var(--rain); }
+.pourbox { fill: none; stroke: var(--ink); stroke-width: 2; }
+@media (max-width: 860px) { .trackdetail { grid-template-columns: 1fr; } }
 
 /* range buttons */
 .seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; background: var(--surface); }
