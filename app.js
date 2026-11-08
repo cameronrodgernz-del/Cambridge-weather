@@ -77,9 +77,12 @@
       key: "terapa", name: "Te Rapa Racecourse", title: "Te Rapa Racecourse Weather", region: "Hamilton, Waikato",
       lat: -37.7662, lon: 175.2463, path: "/te-rapa", track: true, radar: true,
       metservice: "https://www.metservice.com/towns-cities/locations/hamilton", metserviceName: "Hamilton",
+      short: "Te Rapa", hand: "left",
       // The home straight runs north-north-west to the winning post (bearing about 336°, from the OpenStreetMap outline
       // of the track, with the stands on the Te Rapa Road side). Used for headwinds and tailwinds in the straight.
       straight: 336,
+      soilNote: "Te Rapa's sand slits drain faster than the soil around it, so read it for the direction, wetting up or drying out, more than the number.",
+      calendarNote: "Dates from the NZTR calendar for 2026–27 on loveracing.nz.",
       // Racing hours are taken as 11am to 6pm unless a meeting says otherwise (from/to are clock hours).
       // Dates from the NZTR calendar on loveracing.nz for the 2026–27 season. Add the next season's dates before August 2027.
       meetings: [
@@ -101,6 +104,66 @@
         { date: "2027-06-12" },
         { date: "2027-07-03" },
         { date: "2027-07-24", name: "Taumarunui Racing Club" }
+      ]
+    },
+    ellerslie: {
+      key: "ellerslie", name: "Ellerslie Racecourse", title: "Ellerslie Racecourse Weather", region: "Ellerslie, Auckland",
+      lat: -36.8891, lon: 174.8023, path: "/ellerslie", track: true, radar: true,
+      metservice: "https://www.metservice.com/towns-cities/locations/auckland", metserviceName: "Auckland",
+      short: "Ellerslie", hand: "right",
+      // Right-handed. The home straight runs west-north-west to the post in front of the Ascot and Ellerslie stands
+      // (bearing about 299°, from the OpenStreetMap outline of the track).
+      straight: 299,
+      soilNote: "Ellerslie's StrathAyr track is a sand profile built to drain quickly, so it dries and recovers faster than the soil the model assumes. Read it for the direction, wetting up or drying out, more than the number.",
+      calendarNote: "Dates from Auckland Thoroughbred Racing's 2026/27 calendar.",
+      // Racing hours (from/to, clock hours) come from the first race time on ATR's raceday pages, or the NZTR and TAB
+      // racing calendar where ATR hasn't posted one yet, plus the number of races. Add the 2027/28 dates before August 2027.
+      meetings: [
+        { date: "2026-09-05", name: "Proisir Plate Day", from: 12, to: 18 },
+        { date: "2026-09-19", name: "Spring Raceday", from: 12, to: 17 },
+        { date: "2026-10-17", name: "Everest Raceday", from: 12, to: 17 },
+        { date: "2026-10-24", name: "Cox Plate Raceday", from: 12, to: 17 },
+        { date: "2026-11-03", name: "Melbourne Cup Day", from: 11, to: 17 },
+        { date: "2026-11-28", name: "Cure Kids Raceday", from: 12, to: 18 },
+        { date: "2026-12-05", name: "Christmas at the Races", from: 13, to: 18 },
+        { date: "2026-12-10", name: "Twilight Races", from: 16, to: 20 },
+        { date: "2026-12-26", name: "SkyCity Boxing Day Races", from: 12, to: 18 },
+        { date: "2027-01-01", name: "SkyCity New Year's Day Races", from: 12, to: 18 },
+        { date: "2027-01-09", name: "Summer Raceday", from: 13, to: 18 },
+        { date: "2027-01-23", name: "TAB Karaka Millions", from: 15, to: 20 },
+        { date: "2027-01-30", name: "Family Raceday", from: 12, to: 18 },
+        { date: "2027-02-20", name: "Eagle Technology Raceday", from: 12, to: 17 },
+        { date: "2027-03-06", name: "Champions Day", from: 12, to: 19 },
+        { date: "2027-03-20", name: "March Raceday", from: 12, to: 18 },
+        { date: "2027-04-17", name: "Manco Irish Raceday", from: 12, to: 17 },
+        { date: "2027-04-26", name: "ANZAC Raceday", from: 12, to: 17 },
+        { date: "2027-05-05", name: "Ladies' Day", from: 12, to: 17 },
+        { date: "2027-05-15", name: "Autumn Raceday", from: 12, to: 17 },
+        { date: "2027-05-22", name: "May Raceday", from: 13, to: 18 },
+        { date: "2027-06-05", name: "King's Birthday Raceday", from: 12, to: 17 }
+      ]
+    },
+    pukekohe: {
+      key: "pukekohe", name: "Pukekohe Park", title: "Pukekohe Park Weather", region: "Pukekohe, Auckland",
+      lat: -37.2151, lon: 174.9189, path: "/pukekohe", track: true, radar: true,
+      metservice: "https://www.metservice.com/towns-cities/locations/pukekohe", metserviceName: "Pukekohe",
+      short: "Pukekohe", hand: "right",
+      // Right-handed. The home straight runs north-west to the post in front of the stands on the Manukau Road side
+      // (bearing about 324°, from the OpenStreetMap outline of the track).
+      straight: 324,
+      soilNote: "The racing surface has its own drainage under it, rebuilt in recent years, so it won't follow the paddocks around it exactly. Read it for the direction, wetting up or drying out, more than the number.",
+      calendarNote: "Dates from Auckland Thoroughbred Racing's 2026/27 calendar.",
+      meetings: [
+        { date: "2026-10-28", name: "October Raceday", from: 12, to: 18 },
+        { date: "2026-11-21", name: "TAB Counties Cup", from: 12, to: 17 },
+        { date: "2027-01-17", name: "January Raceday", from: 13, to: 18 },
+        { date: "2027-02-24", name: "February Raceday", from: 14, to: 19 },
+        { date: "2027-03-12", name: "March Raceday", from: 12, to: 17 },
+        { date: "2027-03-19", name: "Trades' Day", from: 12, to: 18 },
+        { date: "2027-03-31", name: "Easter Raceday", from: 12, to: 17 },
+        { date: "2027-04-21", name: "April Raceday", from: 12, to: 17 },
+        { date: "2027-06-23", name: "Ladies' Day", from: 11, to: 16 },
+        { date: "2027-07-14", name: "Winter Raceday", from: 12, to: 17 }
       ]
     },
     golf: {

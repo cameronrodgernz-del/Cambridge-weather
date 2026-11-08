@@ -32,6 +32,14 @@
     {
       "source": "/te-rapa",
       "destination": "/"
+    },
+    {
+      "source": "/ellerslie",
+      "destination": "/"
+    },
+    {
+      "source": "/pukekohe",
+      "destination": "/"
     }
   ],
   "headers": [

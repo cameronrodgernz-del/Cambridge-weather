@@ -1,4 +1,5 @@
-/* Te Rapa Racecourse: the next meeting, the rain radar and the "On the track" section.
+/* Racecourses (Te Rapa, Ellerslie, Pukekohe): the next meeting, the rain radar and the "On the track" section.
+   Each course's name, direction of running, home straight, soil note and race dates sit on its entry in PLACES.
    Built from the same forecast as the rest of the page (app.js hands it over in Track.render),
    plus RainViewer's radar frames on an OpenStreetMap base. Shows only on places with track: true or radar: true. */
 (function () {
@@ -49,7 +50,7 @@
   function meetings() {
     return (P.meetings || []).map(m => {
       const from = m.from != null ? m.from : FROM, to = m.to != null ? m.to : TO;
-      return Object.assign({}, m, { from, to, start: C.tnum(m.date + "T" + pad(from) + ":00"), end: C.tnum(m.date + "T" + pad(to) + ":00"), morning: C.tnum(m.date + "T06:45") });
+      return Object.assign({}, m, { from, to, timed: m.from != null, start: C.tnum(m.date + "T" + pad(from) + ":00"), end: C.tnum(m.date + "T" + pad(to) + ":00"), morning: C.tnum(m.date + "T06:45") });
     });
   }
   function dayWord(date) {
@@ -73,11 +74,11 @@
     if (x.wind < 8) return "Light";
     return straightDir(x.dir);
   }
-  // diff is 0 when the wind blows straight down the track into the horses' faces; negative when it comes from their left,
-  // which on a left-handed track is the inside rail
+  // diff is 0 when the wind blows straight down the track into the horses' faces, and negative when it comes from
+  // their left. The inside rail is on their left on a left-handed track and on their right on a right-handed one.
   function straightKind(dir) {
     const diff = ((dir - P.straight + 540) % 360) - 180;
-    const a = Math.abs(diff), side = diff < 0 ? "inside" : "outside";
+    const a = Math.abs(diff), side = (diff < 0) === (P.hand !== "right") ? "inside" : "outside";
     if (a <= 30) return { short: "Headwind", prose: "a headwind" };
     if (a <= 65) return { short: "Headwind, angled", prose: "a headwind angled across the track" };
     if (a < 115) return { short: "Crosswind from the " + side, prose: "a crosswind from the " + side };
@@ -163,14 +164,14 @@
     const next = all.find(m => m.end > S.nowN);
     const box = $("raceBox"), detail = $("raceDetail");
     if (!next) {
-      $("raceEyebrow").textContent = "Te Rapa race days";
+      $("raceEyebrow").textContent = P.short + " race days";
       $("h-race").textContent = "No more meetings this season";
       $("raceRead").innerHTML = "<p>The meetings listed for this season are all done. Next season's dates go in once NZTR publishes them.</p>";
       box.hidden = true; detail.innerHTML = ""; $("raceSeason").innerHTML = "";
       return;
     }
     const k = dayCount(S.todayDate, next.date);
-    $("raceEyebrow").textContent = k === 0 ? "Racing at Te Rapa today" : "Next meeting at Te Rapa, " + (k === 1 ? "tomorrow" : "in " + k + " days");
+    $("raceEyebrow").textContent = k === 0 ? "Racing at " + P.short + " today" : "Next meeting at " + P.short + ", " + (k === 1 ? "tomorrow" : "in " + k + " days");
     $("h-race").textContent = longDate(next.date) + (next.name ? ", " + next.name : "");
     const day = S.days.find(d => d.date === next.date);
     const race = hoursBetween(next.start, next.end);
@@ -319,7 +320,7 @@
 
     $("raceDetail").innerHTML =
       '<div class="col"><h3>Racing hours, ' + C.esc(dayName) + '</h3><div class="tablewrap"><table class="racehours"><thead><tr><th></th><th>Sky</th><th class="n">Temp</th><th>Rain</th><th>Wind (km/h)</th><th>In the straight</th></tr></thead><tbody>' + rows + "</tbody></table></div>" +
-      '<p class="small">Racing hours are taken as ' + C.fmtH(m.from) + " to " + C.fmtH(m.to) + ', so check the times for the day. "In the straight" is the wind as the horses meet it running to the post, and inside and outside are the rails.</p></div>' +
+      '<p class="small">Racing hours are taken as ' + C.fmtH(m.from) + " to " + C.fmtH(m.to) + (m.timed ? ", from the club's listed first race and number of races" : "") + ', so check the times for the day. "In the straight" is the wind as the horses meet it running to the post, and inside and outside are the rails.</p></div>' +
       '<div class="col"><h3>Track checks</h3><div class="tablewrap"><table class="checks"><thead><tr><th></th><th class="n">When</th><th>Weather</th><th>Rain to the next check</th></tr></thead><tbody>' + crow + racingRow + "</tbody></table></div>" +
       '<p class="small">The 48 and 24 hour checks are timed from the start of racing.</p>' +
       "<h3>The last seven days</h3><p>About " + C.esc(mmFig(pmm)) + " of rain and " + C.r0(pet) + " mm of evaporation, from the weather models. Check the rain against the course gauge before it goes on the track information sheet.</p></div>";
@@ -337,14 +338,14 @@
       const cls = [m === next ? "next" : "", i >= SHOW && !seasonOpen ? "more" : ""].filter(Boolean).join(" ");
       return "<tr" + (cls ? ' class="' + cls + '"' : "") + (i >= SHOW && !seasonOpen ? " hidden" : "") + '><td class="part">' + shortDate(m.date) + " " + m.date.slice(0, 4) + (m.name ? '</td><td>' + C.esc(m.name) : "</td><td>") + '</td><td class="n">' + away + '</td><td class="n">' + (gaps[i] != null ? gaps[i] + " days" : "–") + "</td></tr>";
     }).join("");
-    let lead = (ahead.length === 1 ? "One meeting" : cap1(word(ahead.length)) + " meetings") + " left at Te Rapa this season.";
+    let lead = (ahead.length === 1 ? "One meeting" : cap1(word(ahead.length)) + " meetings") + " left at " + P.short + " this season.";
     if (longest >= 0 && ahead.length > 2) {
       const m = ahead[longest], prev = all[all.indexOf(m) - 1];
       lead += " The longest break is " + gaps[longest] + " days, from " + C.dnum(prev.date) + " " + C.mon(prev.date) + " to " + C.dnum(m.date) + " " + C.mon(m.date) + ".";
     }
     $("raceSeason").innerHTML = "<h3>The rest of the season</h3><p>" + C.esc(lead) + '</p><div class="tablewrap"><table class="season"><thead><tr><th>Date</th><th></th><th class="n">Away</th><th class="n">Break</th></tr></thead><tbody>' + rows + "</tbody></table></div>" +
       (ahead.length > SHOW && !seasonOpen ? '<button type="button" class="morebtn" id="seasonMore">Show all ' + ahead.length + " meetings</button>" : "") +
-      '<p class="small">Dates from the NZTR calendar for 2026–27 on loveracing.nz.</p>';
+      '<p class="small">' + C.esc(P.calendarNote || "") + "</p>";
     const btn = $("seasonMore");
     if (btn) btn.addEventListener("click", () => { seasonOpen = true; renderSeason(all, next); });
   }
@@ -390,8 +391,14 @@
     const nextH = S.H.filter(x => x.n >= Math.floor(S.nowN) && x.n < S.nowN + 168);
     const storms = runs(nextH, thunder);
     if (storms.length) {
-      const bits = storms.slice(0, 4).map(r => (dayWord(r.date) === "today" ? "today" : dayWord(r.date) === "tomorrow" ? "tomorrow" : "on " + dayWord(r.date)) + " " + span(r.rows));
-      out.push("Thunderstorms are possible " + C.listJoin(bits) + (storms.length > 4 ? ", and on other days later in the week" : "") + ".");
+      // one phrase per day, so two spells on the same day read "tomorrow from 2pm to 4pm and at 8pm"
+      const dates = [];
+      storms.forEach(r => { if (dates.indexOf(r.date) < 0) dates.push(r.date); });
+      const bits = dates.slice(0, 4).map(date => {
+        const w = dayWord(date);
+        return (w === "today" || w === "tomorrow" ? w : "on " + w) + " " + storms.filter(r => r.date === date).map(r => span(r.rows)).join(" and ");
+      });
+      out.push("Thunderstorms are possible " + C.listJoin(bits) + (dates.length > 4 ? ", and on other days later in the week" : "") + ".");
     }
     const pours = nextH.filter(x => x.mm >= 5);
     if (pours.length) {
@@ -458,7 +465,7 @@
     $("trackWater").innerHTML = "<h3>Rain in, evaporation out</h3>" + C.waterChart(S);
     const soilTxt = writeSoil();
     $("trackSoil").innerHTML = "<h3>Soil moisture</h3>" + (soilTxt ? "<p>" + C.esc(soilTxt) + "</p>" : "") + soilChart() +
-      '<p class="small"><span class="keyline"></span>Top 9 cm <span class="keyline dash" style="margin-left:10px"></span>9 to 27 cm, as a share of the soil\'s volume. This is the weather model\'s estimate for the area, not a reading from the track. Te Rapa\'s sand slits drain faster than the soil around it, so read it for the direction, wetting up or drying out, more than the number.</p>' +
+      '<p class="small"><span class="keyline"></span>Top 9 cm <span class="keyline dash" style="margin-left:10px"></span>9 to 27 cm, as a share of the soil\'s volume. This is the weather model\'s estimate for the area, not a reading from the track. ' + C.esc(P.soilNote || "") + "</p>" +
       "<h3>Grass</h3>" + grassFacts();
     renderStorm();
   }
@@ -573,7 +580,7 @@
       say(km + " km", { x: cx + 4, y: cy - r - 4, class: "ringl" }, over);
     });
     el("circle", { cx, cy, r: 5.5, class: "pin" }, over);
-    say("Te Rapa", { x: cx + 10, y: cy + 4.5, class: "pinl" }, over);
+    say(P.short, { x: cx + 10, y: cy + 4.5, class: "pinl" }, over);
   }
 
   function frameDiv(f, o) {

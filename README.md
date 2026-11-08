@@ -59,6 +59,18 @@ Racing hours are taken as 11am to 6pm unless a meeting in the list says otherwis
 
 Soil moisture, soil temperature and evaporation come from the Open-Meteo model for the area, not from the track. Te Rapa is sand-slitted and drains faster than the soil around it, so the page uses them for direction rather than as readings.
 
+## Ellerslie and Pukekohe Park
+
+Tabs `/ellerslie` and `/pukekohe` work the same way as Te Rapa, from the same `track.js`. Each racecourse entry in `PLACES` carries:
+
+- `short`: the name used in the race section and on the radar pin
+- `hand`: `"left"` or `"right"`, the direction of running, which decides which rail is the inside for crosswinds in the straight
+- `straight`: the bearing the horses run along the home straight to the post
+- `soilNote` and `calendarNote`: the course's own line under the soil chart and under the season list
+- `meetings`: the season's dates, with optional `name`, and `from` and `to` racing hours
+
+Both Auckland courses are right-handed. Ellerslie's home straight runs west-north-west (about 299°) in front of the Ascot and Ellerslie stands, and Pukekohe's runs north-west (about 324°) in front of the stands on the Manukau Road side, both worked out from the OpenStreetMap outlines of the tracks. Their 2026/27 dates come from Auckland Thoroughbred Racing's calendar in its 2026 annual report. Racing hours come from the first race times on ATR's raceday pages, or from the NZTR and TAB racing calendar where ATR hasn't posted one, plus the number of races. The 2027/28 dates need adding before August 2027.
+
 ## Hosting
 
 It's a plain static site: `index.html`, `styles.css`, `app.js`, with `finder.js` for the tee times tab and `track.js` for the racecourse. No build step and no keys. On Vercel, import the GitHub repository and deploy with the default settings (Framework preset: Other).
