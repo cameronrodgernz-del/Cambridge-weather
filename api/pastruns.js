@@ -23,6 +23,13 @@ async function handler(req, res) {
     if (cache) res.setHeader("Cache-Control", "public, s-maxage=86400, stale-while-revalidate=604800");
     res.end(body);
   };
+  // live=1 returns the model comparison exactly as the pages request it, to check the line-up is being served
+  if (site && q.live) {
+    const live = "https://api.open-meteo.com/v1/forecast?latitude=" + site[0] + "&longitude=" + site[1] + "&timezone=Pacific%2FAuckland&forecast_days=8" +
+      "&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&models=ecmwf_ifs,ecmwf_aifs025_single,ukmo_seamless,gfs_seamless,icon_seamless,gem_seamless";
+    try { const r = await fetch(live); send(r.status, await r.text(), false); } catch (e) { send(502, JSON.stringify({ error: "Couldn't reach the forecast service" })); }
+    return;
+  }
   if (!site || !MODELS.has(model) || !day.test(start) || !day.test(end) || end < start || Date.parse(end) - Date.parse(start) > 370 * 86400000) {
     send(400, JSON.stringify({ error: "Pass site, model, start=YYYY-MM-DD and end=YYYY-MM-DD (up to a year apart)" }));
     return;
