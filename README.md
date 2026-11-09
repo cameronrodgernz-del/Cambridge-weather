@@ -8,7 +8,7 @@ Hour-by-hour weather for Cambridge, Waikato. The page pulls fresh model data fro
 - Seven-day ledger with sky, highs and lows, rain amount and how likely it is, wind, and fog or frost flags
 - Hour-by-hour chart on one time line: temperature and dew point, chance of rain, wind and gusts, cloud cover, and a fog and frost risk strip, with a 48 hour, 4 day or 7 day view
 - Detail for any day: overnight, morning, afternoon and evening, sunrise and sunset, UV and sun protection hours
-- How firm the forecast is: rain each day from six weather models (ECMWF, UK Met Office, GFS, ICON, GEM, JMA) and the 51-run ECMWF ensemble
+- How firm the forecast is: rain each day from six weather models (ECMWF 9 km, ECMWF's AI model, UK Met Office, GFS, ICON, GEM) and the 51-run ECMWF ensemble
 - The past week's rain and temperatures
 
 ## Tīeke Golf Estate
@@ -70,6 +70,23 @@ Tabs `/ellerslie` and `/pukekohe` work the same way as Te Rapa, from the same `t
 - `meetings`: the season's dates, with optional `name`, and `from` and `to` racing hours
 
 Both Auckland courses are right-handed. Ellerslie's home straight runs west-north-west (about 299°) in front of the Ascot and Ellerslie stands, and Pukekohe's runs north-west (about 324°) in front of the stands on the Manukau Road side, both worked out from the OpenStreetMap outlines of the tracks. Their 2026/27 dates come from Auckland Thoroughbred Racing's calendar in its 2026 annual report. Racing hours come from the first race times on ATR's raceday pages, or from the NZTR and TAB racing calendar where ATR hasn't posted one, plus the number of races. The 2027/28 dates need adding before August 2027.
+
+## How the rain blend was chosen
+
+The daily rain figure in the summaries is a blend of six models: the European 9 km model (ECMWF IFS), the European AI model (AIFS), the UK Met Office, the US GFS, the German ICON and the Canadian GEM. With five or more models reporting, the highest and the lowest are dropped and the rest averaged; with fewer, the middle value is used. The US model's rain is left out from five days ahead. The 51-run European ensemble is used for the chance of rain, not for the amount.
+
+That line-up came from a back-test in November 2026. Each model's past forecasts, one to seven days ahead, came from Open-Meteo's Previous Runs archive, and were scored against the 24-hour rain totals reported by the Hamilton Airport gauge (WMO 93173) and the Auckland Airport gauge (WMO 93110) from January 2024 to November 2026, about 980 days at each. What it showed:
+
+- The Japanese model (JMA) was the least accurate of the old six at every range at both gauges, and ran wet at Hamilton. It was dropped.
+- Open-Meteo's default feed for New Zealand is the European 9 km model, so the old blend counted the European model three times (the default, the 25 km version and the middle of its 51 runs). The 9 km version matched the 25 km at one to two days and beat it at three to five, so the 25 km version was dropped.
+- The European AI model was the most accurate single model, or level with the best, at both gauges, and caught more of the days of 10 mm or more than the European 25 km model. It runs about 15% too wet on average, which offsets the other models running slightly dry. It was added.
+- The US model's rain from five days ahead averaged around half of what fell, at both gauges and in every year of the archive, so it is left out at that range.
+- The Australian (ACCESS-G), GraphCast and Korean models have stopped updating in Open-Meteo's archive. The French model was good to three days but only runs four days and didn't improve the blend. The Chinese model was among the weakest.
+- Dropping the highest and lowest and averaging the rest had the lowest or near-lowest average miss of the ways tried, and ran less dry than taking the middle value.
+
+On the same days, the new blend's average miss on a day's rain, one to six days ahead, was about 6% lower than the old blend's at Hamilton (2.40 mm down to 2.26 mm) and about 4% lower at Auckland (2.53 mm down to 2.42 mm), from February 2025 on. At five and six days ahead it caught about half the days of 10 mm or more, up from about four in ten. The blend beat every single model at one to three days ahead.
+
+Limits: the airport gauges are about 13 km from Te Rapa and Ellerslie and 25 km from Pukekohe, the test covers daily totals only (not the timing of showers within a day), and the 51-run middle in the old blend couldn't be rebuilt from the archive. The scripts are in `backtest/`. `/api/pastruns` passes requests to the Previous Runs archive for the gauge sites, and with `live=1` returns the model comparison as the pages request it. Worth re-running once a year, or when a course has its own gauge record to score against.
 
 ## Hosting
 

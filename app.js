@@ -183,14 +183,18 @@
   }
   let PLACE = placeFromAddress();
 
+  // The line-up and the way the rain figures are blended were set by scoring each model's past forecasts against the
+  // Hamilton and Auckland airport rain gauges, January 2024 to November 2026 (see the README, "How the rain blend was chosen").
   const MODELS = [
-    ["ecmwf_ifs025", "European (ECMWF)"],
+    ["ecmwf_ifs", "European (ECMWF, 9 km)"],
+    ["ecmwf_aifs025_single", "European AI (AIFS)"],
     ["ukmo_seamless", "UK Met Office"],
     ["gfs_seamless", "US (GFS)"],
     ["icon_seamless", "German (ICON)"],
-    ["gem_seamless", "Canadian (GEM)"],
-    ["jma_seamless", "Japanese (JMA)"]
+    ["gem_seamless", "Canadian (GEM)"]
   ];
+  // From this many days ahead the US model's rain is left out: at that range its figures on this feed ran about half too low.
+  const US_RAIN_UNTIL = 5;
   const REFRESH_MINUTES = 30;
 
   /* ---------- requests ---------- */
@@ -410,9 +414,10 @@
       models.daily.time.forEach((d, i) => {
         modelDay[d] = MODELS.map(([key, label]) => ({
           key, label,
-          mm: models.daily["precipitation_sum_" + key] ? models.daily["precipitation_sum_" + key][i] : null,
-          hi: models.daily["temperature_2m_max_" + key] ? models.daily["temperature_2m_max_" + key][i] : null,
-          lo: models.daily["temperature_2m_min_" + key] ? models.daily["temperature_2m_min_" + key][i] : null
+          mm: models.daily["precipitation_sum_" + key] && !(key === "gfs_seamless" && i >= US_RAIN_UNTIL) ? models.daily["precipitation_sum_" + key][i] : null,
+          // the AI model only reports every six hours, which clips the day's high and low, so its temperatures are left out
+          hi: models.daily["temperature_2m_max_" + key] && key !== "ecmwf_aifs025_single" ? models.daily["temperature_2m_max_" + key][i] : null,
+          lo: models.daily["temperature_2m_min_" + key] && key !== "ecmwf_aifs025_single" ? models.daily["temperature_2m_min_" + key][i] : null
         })).filter(m => m.mm != null || m.hi != null);
       });
     }
@@ -447,11 +452,13 @@
       };
       dd.sky = sky(wakingMM, waking.filter(x => x.mm >= 0.2).length, dd.cloud, false);
       dd.pRain = dd.ens ? dd.ens.wet / dd.ens.n : (dd.popMax != null ? dd.popMax / 100 : null);
-      // rain amount: the middle of every estimate we have (blend, each model, ensemble middle)
-      const est = [mm].concat(dd.models.map(m => m.mm)).concat(dd.ens ? [dd.ens.p50] : []).filter(v => v != null).sort((a, b) => a - b);
+      // rain amount: with five or more models, drop the highest and the lowest and average the rest; with fewer, take the
+      // middle one. If the model comparison didn't load, fall back to the hourly feed's own total.
+      let est = dd.models.map(m => m.mm).filter(v => v != null).sort((a, b) => a - b);
+      if (est.length < 3) est = [mm].concat(est).filter(v => v != null).sort((a, b) => a - b);
       const trimmed = est.length >= 5 ? est.slice(1, -1) : est;
-      dd.mmMid = est.length ? est[Math.floor(est.length / 2)] : mm;
-      dd.mmLo = trimmed[0]; dd.mmHi = trimmed[trimmed.length - 1];
+      dd.mmMid = !est.length ? mm : est.length >= 5 ? sum(trimmed) / trimmed.length : est.length % 2 ? est[(est.length - 1) / 2] : (est[est.length / 2 - 1] + est[est.length / 2]) / 2;
+      dd.mmLo = trimmed.length ? trimmed[0] : mm; dd.mmHi = trimmed.length ? trimmed[trimmed.length - 1] : mm;
       dd.dryModels = dd.models.filter(m => m.mm != null && m.mm < 1).length;
       dd.dry = dd.mmMid < 0.2 && (dd.pRain == null || dd.pRain < 0.25);
       dd.fog = dd.fogHrs >= 2;
@@ -670,11 +677,11 @@
     const days = S.days.slice(S.ti, S.ti + 7);
     const head = '<thead><tr><th>Rain (mm)</th>' + days.map(d => '<th class="n">' + (d.i === S.ti ? "Today" : d.name.slice(0, 3)) + "</th>").join("") + "</tr></thead>";
     const f = v => v == null ? "–" : v.toFixed(1);
-    let body = '<tr><td>Blended forecast (hourly chart)</td>' + days.map(d => '<td class="n">' + f(d.mm) + "</td>").join("") + "</tr>";
+    let body = '<tr><td>Hour-by-hour chart</td>' + days.map(d => '<td class="n">' + f(d.mm) + "</td>").join("") + "</tr>";
     MODELS.forEach(([key, label]) => {
       body += "<tr><td>" + label + "</td>" + days.map(d => { const m = d.models.find(x => x.key === key); return '<td class="n">' + f(m ? m.mm : null) + "</td>"; }).join("") + "</tr>";
     });
-    body += '<tr class="blend"><td>Middle of all estimates (used in the summary)</td>' + days.map(d => '<td class="n">' + f(d.mmMid) + "</td>").join("") + "</tr>";
+    body += '<tr class="blend"><td>Blend used in the summary</td>' + days.map(d => '<td class="n">' + f(d.mmMid) + "</td>").join("") + "</tr>";
     if (S.hasEns) body += '<tr class="ens"><td>Ensemble runs with 1 mm or more</td>' + days.map(d => '<td class="n">' + (d.ens ? d.ens.wet + "/" + d.ens.n : "–") + "</td>").join("") + "</tr>";
     body += '<tr><th>High (°C)</th>' + days.map(() => "<th></th>").join("") + "</tr>";
     body += "<tr><td>Range across the models</td>" + days.map(d => {
@@ -702,7 +709,7 @@
     if (spreads.length) ps.push("Daily highs agree to within about " + Math.max(1, r0(spreads[Math.floor(spreads.length / 2)])) + "°C on most days.");
     if (!S.hasModels) ps.push("The model comparison didn't load this time. Refresh the page to try again.");
     $("agreeText").innerHTML = (ps.length ? "<p>" + esc(ps.join(" ")) + "</p>" : "") +
-      '<p class="small">Each model reports for its nearest grid point, so small differences are normal. Forecasts more than four or five days out can change from one update to the next.</p>';
+      '<p class="small">The blend drops the highest and the lowest model and averages the rest. The line-up and the blend were chosen by scoring each model\'s past forecasts against the Hamilton and Auckland airport rain gauges from January 2024 to November 2026. The US model is left out from five days ahead, where its rain figures ran about half too low. Each model reports for its nearest grid point, so small differences are normal, and forecasts more than four or five days out can change from one update to the next.</p>';
   }
 
   function renderPast() {
