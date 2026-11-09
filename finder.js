@@ -34,6 +34,17 @@
     return "https://api.open-meteo.com/v1/forecast?" + Object.entries(q).map(([k, v]) => k + "=" + encodeURIComponent(v)).join("&");
   }
 
+  // Rain by the hour from each model in the blend, for every course, so the rain figures and play scores here are
+  // worked out the same way as on the other tabs.
+  function modelsUrl() {
+    const q = {
+      latitude: COURSES.map(c => c.lat.toFixed(4)).join(","),
+      longitude: COURSES.map(c => c.lon.toFixed(4)).join(","),
+      timezone: "Pacific/Auckland", forecast_days: 8, hourly: "precipitation", models: K().MODEL_KEYS.join(",")
+    };
+    return "https://api.open-meteo.com/v1/forecast?" + Object.entries(q).map(([k, v]) => k + "=" + encodeURIComponent(v)).join("&");
+  }
+
   async function getJSON(url, ms) {
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), ms || 25000);
@@ -45,9 +56,10 @@
     } finally { clearTimeout(timer); }
   }
 
-  function buildWeather(list) {
+  function buildWeather(list, models) {
     const k = K();
     const arr = Array.isArray(list) ? list : [list];
+    const marr = !models ? [] : Array.isArray(models) ? models : [models];
     const byCourse = {};
     let now = null;
     COURSES.forEach((c, i) => {
@@ -62,6 +74,8 @@
         vis: g("visibility", n), wind: g("wind_speed_10m", n), dir: g("wind_direction_10m", n), gust: g("wind_gusts_10m", n),
         isDay: g("is_day", n)
       })).filter(x => x.temp != null);
+      // the blended rain for each hour, if the models' hours loaded; otherwise the feed's own figure stands
+      if (marr[i] && marr[i].hourly) k.blendHours(rows, marr[i].hourly);
       rows.forEach(x => {
         const spread = x.dew != null ? x.temp - x.dew : 99;
         const darkish = x.hr >= 20 || x.hr <= 10;
@@ -82,8 +96,10 @@
   async function loadWeather(force) {
     if (W && !force && Date.now() - wxAt < 30 * 60000) return;
     const snap = window.FINDER_SNAPSHOT;
-    const data = snap ? snap.weather : await getJSON(weatherUrl());
-    W = buildWeather(data);
+    // the models' hours are an extra: if that request fails the tab still loads on the feed's own rain
+    const [data, models] = snap ? [snap.weather, snap.models || null]
+      : await Promise.all([getJSON(weatherUrl()), getJSON(modelsUrl(), 30000).catch(() => null)]);
+    W = buildWeather(data, models);
     wxAt = Date.now();
   }
 

@@ -8,7 +8,7 @@ const SITES = {
   auckland: [-37.008, 174.789],     // Auckland Airport gauge (WMO 93119)
   pukekohe: [-37.206, 174.864],     // Pukekohe gauge (WMO 93124)
   tauranga: [-37.672, 176.196],     // Tauranga Airport gauge (WMO 93186), about 4 km from Mount Maunganui
-  wellington: [-41.327, 174.805]    // Wellington Airport gauge (WMO 93436)
+  wellington: [-41.327, 174.805]    // Wellington Airport gauge (WMO 93439)
 };
 const MODELS = new Set([
   "best_match", "ecmwf_ifs025", "ecmwf_ifs", "ecmwf_aifs025_single", "ukmo_seamless", "gfs_seamless", "gfs_graphcast025",

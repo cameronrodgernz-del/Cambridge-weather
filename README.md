@@ -20,7 +20,7 @@ A switch at the top moves between Cambridge and Tīeke Golf Estate (72 Lochiel R
 - First light, last tee times for 18 and 9 holes, sunset and sunscreen hours for today and tomorrow
 - Rain over the last 48 hours and what that means underfoot, plus booking details
 
-Each daylight hour scores out of 100 and loses points for rain (more for heavier rain), a high chance of showers, wind over 15 km/h, gusts over 30 km/h, a feels-like temperature under 15°C or over 28°C, fog and frost.
+Each daylight hour scores out of 100 and loses points for rain (more for heavier rain, and more the more of the models have it), a high chance of showers, wind over 15 km/h, gusts over 30 km/h, a feels-like temperature under 15°C or over 28°C, fog and frost.
 
 ## Mount Maunganui
 
@@ -88,13 +88,17 @@ On the same days, the new blend's average miss on a day's rain, one to six days 
 
 Limits: the airport gauges are about 13 km from Te Rapa and Ellerslie and 25 km from Pukekohe, this test covers daily totals (the next section covers six-hour totals), and the 51-run middle in the old blend couldn't be rebuilt from the archive. The scripts are in `backtest/`. `/api/pastruns` passes requests to the Previous Runs archive for the gauge sites, and with `live=1` returns the model comparison as the pages request it. Worth re-running once a year, or when a course has its own gauge record to score against.
 
-## Rain by the hour and the chance of rain at the racecourses
+## Rain by the hour, play scores and the chance of rain
 
-On the racecourse tabs the rain for each hour, from today on, is the average of the six models for that hour, scaled so the day's hours add up to the day's blend. So the hourly charts, the totals before each track check and the daily figures all agree. The other tabs still take their hours from Open-Meteo's default feed (the European 9 km model).
+On every tab the rain for each hour, from today on, is the average of the six models for that hour, scaled so the day's hours add up to the day's blend. So the hourly charts, the parts of the day, the totals before each track check and the daily figures all agree. The tee times tab does the same for each course. If the models' hours don't load, a tab falls back to Open-Meteo's default feed (the European 9 km model).
 
 This came from a second back-test in November 2026 against the six-hour rain totals the same two airport gauges report. From October 2025, when the 9 km model's archive starts, the average miss on a six-hour total fell by 13 to 19% against the European model's hours on their own: at Hamilton from 0.86 mm to 0.75 mm at one to two days ahead and from 1.10 mm to 0.91 mm at five to six; at Auckland from 0.79 mm to 0.67 mm and from 1.01 mm to 0.86 mm. It caught about as many of the windows with 5 mm or more, with fewer false calls (at one to two days ahead, 36 to 37% of its 5 mm calls were wrong, down from 46 to 50%). It runs slightly dry, by about 0.1 mm per six hours.
 
 Averaging flattens a sharp burst, because the models rarely put it in the same hour. So the "5 mm or more in the hour" flags and the heaviest-burst line still read the European 9 km model's own hours, and so does the count of wet hours that decides between "showers" and "rain".
+
+The play score (golf, the beach and the tee times tab) marks an hour down for rain by scoring each model's figure for that hour on its own (0.2 mm or more, 1 mm or more, 3 mm or more) and averaging the marks. An hour only one model has wet loses a little; an hour they all have wet loses the lot. Scoring the blended hour instead would mark down every hour of a showery day, because the average is rarely zero. Set against the gauges' six-hour totals, the averaged marks told wet windows from dry ones better than the single model at every range, and the window they picked as the day's best was wet less often: at one to two days ahead, 19% of the time against 22 to 23% at Hamilton and Auckland, with a quarter to a third less rain in it. The gauges don't report by the hour, so this is tested on six-hour windows, not single hours.
+
+Both changes were checked at two more gauges in November 2026, Tauranga Airport (WMO 93186, about 4 km from Mount Maunganui) and Wellington Airport (WMO 93439), from October 2025. The daily blend beat every single model at both, at one to three and at four to six days ahead. The blended hours' average miss on a six-hour total was 15 to 21% lower than the European model's hours at Tauranga and 8 to 14% lower at Wellington, and the play score result held at both. Royal Wellington at Heretaunga is about 25 km from the Wellington gauge and sits in different terrain, so it is the least proven of the places.
 
 The chance tables ("Chance of at least this much rain") give the chance of 1, 5, 10 and 20 mm falling in a stretch of hours. Each chance comes from two things: the share of the models whose total for the stretch reaches the amount, and how far the blended total is from it. The weights were fitted to what fell at the gauges from February 2025 to November 2026, with one set for part of a day, one for about a day and one for several days. Fitted on one gauge and checked on the other, the chances held up: for a day or several days, 50% came in at 44 to 53%, 70% at 64 to 75% and 88% at 85 to 89%. For part of a day, 70% came in at 64 to 69%, and the 10 and 20 mm figures there rest on few cases and ran a little high in the middle of the range. The weights are in `track.js` (`CHANCE`) and the fitting is in `backtest/chance.py`.
 

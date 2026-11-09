@@ -212,8 +212,9 @@
     })),
     models: "https://api.open-meteo.com/v1/forecast?" + qs(Object.assign({}, common, {
       forecast_days: 8, daily: "temperature_2m_max,temperature_2m_min,precipitation_sum",
-      models: MODELS.map(m => m[0]).join(",")
-    }, place.track ? { hourly: "precipitation" } : {})),
+      models: MODELS.map(m => m[0]).join(","),
+      hourly: "precipitation"
+    })),
     ens: "https://ensemble-api.open-meteo.com/v1/ensemble?" + qs(Object.assign({}, common, {
       forecast_days: 8, hourly: "precipitation", models: "ecmwf_ifs025"
     })),
@@ -356,6 +357,43 @@
     return { mid, lo: trimmed.length ? trimmed[0] : feedMM, hi: trimmed.length ? trimmed[trimmed.length - 1] : feedMM };
   }
 
+  // The rain for each hour: the average across the models, scaled so the day's hours add up to the day's blend.
+  // Set against six-hourly gauge readings, that ran 13 to 19% closer than one model's hours. Each hour keeps the
+  // hourly feed's own figure as "one" (used for how showery a day reads and for bursts) and each model's figure in
+  // "mods" (used for the play score and the chance of reaching a given amount). mh is the models' hourly block.
+  // midFor(date, hours) gives the day's blended total; left out, it is worked out from the models' hours.
+  function blendHours(H, mh, midFor) {
+    if (!mh || !mh.time) return false;
+    const at = {}, dates = [], byDate = {};
+    mh.time.forEach((t, i) => { at[t] = i; if (dates[dates.length - 1] !== t.slice(0, 10)) dates.push(t.slice(0, 10)); });
+    H.forEach(x => {
+      const i = at[x.t], di = dates.indexOf(x.date);
+      if (i == null) return;
+      if (x.one == null) x.one = x.mm;
+      x.mods = MODELS.map(([key]) => {
+        const a = mh["precipitation_" + key];
+        return a && a[i] != null && !(key === "gfs_seamless" && di >= US_RAIN_UNTIL) ? a[i] : null;
+      });
+      (byDate[x.date] = byDate[x.date] || []).push(x);
+    });
+    let done = false;
+    Object.keys(byDate).forEach(date => {
+      const hrs = byDate[date];
+      const means = hrs.map(x => { const v = x.mods.filter(m => m != null); return v.length >= 3 ? sum(v) / v.length : null; });
+      if (means.some(v => v == null)) return;
+      let mid;
+      if (midFor) mid = midFor(date, hrs);
+      else {
+        const totals = MODELS.map((m, j) => hrs.every(x => x.mods[j] != null) ? { mm: sum(hrs.map(x => x.mods[j])) } : { mm: null });
+        mid = dayBlend(totals, sum(hrs.map(x => x.one))).mid;
+      }
+      const tot = sum(means);
+      hrs.forEach((x, k) => { x.mm = tot > 0 ? means[k] * mid / tot : 0; });
+      done = true;
+    });
+    return done;
+  }
+
   function build(main, models, ens, marine) {
     const h = main.hourly;
     const pick = (k, i) => (h[k] ? h[k][i] : null);
@@ -384,7 +422,6 @@
         : x.temp <= 1 || (x.temp <= 3.5 && (x.cloud == null ? 100 : x.cloud) <= 40 && (x.wind == null ? 99 : x.wind) <= 8);
     });
 
-    H.forEach(x => { x.play = playScore(x); });
     if (marine && marine.hourly) {
       const m = marine.hourly, at = {};
       m.time.forEach((t, i) => { at[t] = i; });
@@ -432,33 +469,10 @@
       });
     }
 
-    // Racecourses: the rain for each hour is the average across the models, scaled so the day's hours add up to the
-    // blended figure for the day. Set against six-hourly gauge readings, that ran 13 to 19% closer than one model's hours.
-    // Each hour keeps the hourly feed's own figure as "one" (used for how showery it reads and for bursts) and each
-    // model's figure in "mods" (used for the chance of reaching a given amount).
-    let hourBlend = false;
-    if (PLACE.track && models && models.hourly && models.daily) {
-      const at = {}, dayAt = {}, byDate = {};
-      models.hourly.time.forEach((t, i) => { at[t] = i; });
-      models.daily.time.forEach((d, i) => { dayAt[d] = i; });
-      H.forEach(x => {
-        const i = at[x.t], di = dayAt[x.date];
-        if (i == null || di == null) return;
-        x.mods = MODELS.map(([key]) => {
-          const a = models.hourly["precipitation_" + key];
-          return a && a[i] != null && !(key === "gfs_seamless" && di >= US_RAIN_UNTIL) ? a[i] : null;
-        });
-        (byDate[x.date] = byDate[x.date] || []).push(x);
-      });
-      Object.keys(byDate).forEach(date => {
-        const hrs = byDate[date];
-        const means = hrs.map(x => { const v = x.mods.filter(m => m != null); return v.length >= 3 ? sum(v) / v.length : null; });
-        if (means.some(v => v == null)) return;
-        const mid = dayBlend(modelDay[date] || [], sum(hrs.map(x => x.one))).mid, tot = sum(means);
-        hrs.forEach((x, k) => { x.mm = tot > 0 ? means[k] * mid / tot : 0; });
-        hourBlend = true;
-      });
-    }
+    // rain for each hour from all the models rather than one (see blendHours)
+    const hourBlend = blendHours(H, models && models.daily ? models.hourly : null,
+      (date, hrs) => dayBlend(modelDay[date] || [], sum(hrs.map(x => x.one))).mid);
+    H.forEach(x => { x.play = playScore(x); });
 
     const dl = main.daily;
     const days = dl.time.map((date, i) => {
@@ -710,7 +724,7 @@
     const days = S.days.slice(S.ti, S.ti + 7);
     const head = '<thead><tr><th>Rain (mm)</th>' + days.map(d => '<th class="n">' + (d.i === S.ti ? "Today" : d.name.slice(0, 3)) + "</th>").join("") + "</tr></thead>";
     const f = v => v == null ? "–" : v.toFixed(1);
-    // at a racecourse the hourly charts already add up to the blend, so they don't get a row of their own
+    // with the models' hours loaded the hourly charts already add up to the blend, so they don't get a row of their own
     let body = S.hourBlend ? "" : '<tr><td>Hour-by-hour chart</td>' + days.map(d => '<td class="n">' + f(d.mm) + "</td>").join("") + "</tr>";
     MODELS.forEach(([key, label]) => {
       body += "<tr><td>" + label + "</td>" + days.map(d => { const m = d.models.find(x => x.key === key); return '<td class="n">' + f(m ? m.mm : null) + "</td>"; }).join("") + "</tr>";
@@ -962,11 +976,19 @@
     let s = 100;
     const why = [];
     const f = x.feels != null ? x.feels : x.temp;
-    if (x.mm >= 3) { s -= 80; why.push("heavy rain"); }
-    else if (x.mm >= 1) { s -= 65; why.push("rain"); }
-    else if (x.mm >= 0.2) { s -= 40; why.push("showers"); }
-    else if ((x.pop || 0) >= 60) { s -= 15; why.push("a chance of showers"); }
-    else if ((x.pop || 0) >= 40) s -= 6;
+    // Rain: each model's figure for the hour is marked down on its own (3 mm or more, 1 mm or more, 0.2 mm or more) and
+    // the marks are averaged, so an hour that only one model has wet costs a little and one they all have wet costs
+    // the lot. Set against the gauges this told wet spells from dry ones better than one model's hours or the blended
+    // hours (backtest/playtest.py). Without the models' hours it falls back to the hour's own figure.
+    const cost = v => v >= 3 ? 80 : v >= 1 ? 65 : v >= 0.2 ? 40 : 0;
+    const each = x.mods ? x.mods.filter(v => v != null) : [];
+    const pop = x.pop || 0;
+    const rain = Math.max(each.length >= 3 ? sum(each.map(cost)) / each.length : cost(x.mm), pop >= 60 ? 15 : pop >= 40 ? 6 : 0);
+    s -= rain;
+    if (rain >= 72) why.push("heavy rain");
+    else if (rain >= 52) why.push("rain");
+    else if (rain >= 25) why.push("showers");
+    else if (rain >= 10) why.push("a chance of showers");
     const w = x.wind || 0, g = x.gust || 0;
     if (w > 15) s -= (w - 15) * 2;
     if (g > 30) s -= (g - 30) * 1.2;
@@ -1617,7 +1639,7 @@
     if (S) { renderChart(); if (PLACE.golf) renderTee(); }
     if (PLACE.track && window.Track) window.Track.resize();
   });
-  window.WXCORE = { tnum, fmtH, fmtClock, wd, dnum, mon, esc, cap, lc, listJoin, dir16, dirLong, meanDir, playScore, playWord,
+  window.WXCORE = { blendHours, MODEL_KEYS: MODELS.map(m => m[0]), tnum, fmtH, fmtClock, wd, dnum, mon, esc, cap, lc, listJoin, dir16, dirLong, meanDir, playScore, playWord,
     r0, sum, avg, maxOf, minOf, mmText, amountText, amountPhrase, agrees, chanceWord, sky, waterChart, TIMEZONE };
   applyPlaceChrome();
   load();
