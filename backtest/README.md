@@ -8,3 +8,4 @@ The scripts work in `/tmp/bt`:
 2. Past forecasts. `pr_fetch.sh SITE` pulls every model's forecasts, 0 to 7 days ahead, through the site's `/api/pastruns` endpoint.
 3. `python3 -I load.py SITE STATION` builds daily totals for the gauge and each model.
 4. `python3 -I score.py SITE` scores each model; `blend.py` and `check.py` test blends; `final.py SITE [START]` compares the blend in `app.js` with the previous one on the same days.
+5. Six-hour totals and the chance of rain. `python3 -I load6.py SITE STATION` builds six-hour totals for the gauge and each model. `eval6.py SITE START` compares ways of getting a six-hour figure from the models. `chance.py` fits the chance of reaching 1, 5, 10 and 20 mm on one gauge, checks it on the other, and prints the weights used in `track.js`.

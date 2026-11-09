@@ -213,7 +213,7 @@
     models: "https://api.open-meteo.com/v1/forecast?" + qs(Object.assign({}, common, {
       forecast_days: 8, daily: "temperature_2m_max,temperature_2m_min,precipitation_sum",
       models: MODELS.map(m => m[0]).join(",")
-    })),
+    }, place.track ? { hourly: "precipitation" } : {})),
     ens: "https://ensemble-api.open-meteo.com/v1/ensemble?" + qs(Object.assign({}, common, {
       forecast_days: 8, hourly: "precipitation", models: "ecmwf_ifs025"
     })),
@@ -346,13 +346,23 @@
   }
 
   /* ---------- build the working model from the three responses ---------- */
+  // A day's rain from the models: with five or more, drop the highest and the lowest and average the rest; with fewer,
+  // take the middle one. If the model comparison didn't load, fall back to the hourly feed's own total.
+  function dayBlend(ms, feedMM) {
+    let est = ms.map(m => m.mm).filter(v => v != null).sort((a, b) => a - b);
+    if (est.length < 3) est = [feedMM].concat(est).filter(v => v != null).sort((a, b) => a - b);
+    const trimmed = est.length >= 5 ? est.slice(1, -1) : est;
+    const mid = !est.length ? feedMM : est.length >= 5 ? sum(trimmed) / trimmed.length : est.length % 2 ? est[(est.length - 1) / 2] : (est[est.length / 2 - 1] + est[est.length / 2]) / 2;
+    return { mid, lo: trimmed.length ? trimmed[0] : feedMM, hi: trimmed.length ? trimmed[trimmed.length - 1] : feedMM };
+  }
+
   function build(main, models, ens, marine) {
     const h = main.hourly;
     const pick = (k, i) => (h[k] ? h[k][i] : null);
     const H = h.time.map((t, i) => ({
       t, n: tnum(t), date: t.slice(0, 10), hr: +t.slice(11, 13),
       temp: pick("temperature_2m", i), feels: pick("apparent_temperature", i), rh: pick("relative_humidity_2m", i),
-      dew: pick("dew_point_2m", i), pop: pick("precipitation_probability", i), mm: pick("precipitation", i) || 0,
+      dew: pick("dew_point_2m", i), pop: pick("precipitation_probability", i), mm: pick("precipitation", i) || 0, one: pick("precipitation", i) || 0,
       cloud: pick("cloud_cover", i), vis: pick("visibility", i), wind: pick("wind_speed_10m", i),
       dir: pick("wind_direction_10m", i), gust: pick("wind_gusts_10m", i), uv: pick("uv_index", i),
       code: pick("weather_code", i), isDay: pick("is_day", i), soilT: pick("soil_temperature_6cm", i),
@@ -422,6 +432,34 @@
       });
     }
 
+    // Racecourses: the rain for each hour is the average across the models, scaled so the day's hours add up to the
+    // blended figure for the day. Set against six-hourly gauge readings, that ran 13 to 19% closer than one model's hours.
+    // Each hour keeps the hourly feed's own figure as "one" (used for how showery it reads and for bursts) and each
+    // model's figure in "mods" (used for the chance of reaching a given amount).
+    let hourBlend = false;
+    if (PLACE.track && models && models.hourly && models.daily) {
+      const at = {}, dayAt = {}, byDate = {};
+      models.hourly.time.forEach((t, i) => { at[t] = i; });
+      models.daily.time.forEach((d, i) => { dayAt[d] = i; });
+      H.forEach(x => {
+        const i = at[x.t], di = dayAt[x.date];
+        if (i == null || di == null) return;
+        x.mods = MODELS.map(([key]) => {
+          const a = models.hourly["precipitation_" + key];
+          return a && a[i] != null && !(key === "gfs_seamless" && di >= US_RAIN_UNTIL) ? a[i] : null;
+        });
+        (byDate[x.date] = byDate[x.date] || []).push(x);
+      });
+      Object.keys(byDate).forEach(date => {
+        const hrs = byDate[date];
+        const means = hrs.map(x => { const v = x.mods.filter(m => m != null); return v.length >= 3 ? sum(v) / v.length : null; });
+        if (means.some(v => v == null)) return;
+        const mid = dayBlend(modelDay[date] || [], sum(hrs.map(x => x.one))).mid, tot = sum(means);
+        hrs.forEach((x, k) => { x.mm = tot > 0 ? means[k] * mid / tot : 0; });
+        hourBlend = true;
+      });
+    }
+
     const dl = main.daily;
     const days = dl.time.map((date, i) => {
       const hrs = H.filter(x => x.date === date);
@@ -434,7 +472,7 @@
       const dd = {
         date, i, name: wd(date), hrs,
         hi: dl.temperature_2m_max[i], lo: dl.temperature_2m_min[i],
-        mm, wakingMM, parts, wetHrs: hrs.filter(x => x.mm >= 0.2).length,
+        mm, wakingMM, parts, wetHrs: hrs.filter(x => x.one >= 0.2).length,
         popMax: dl.precipitation_probability_max ? dl.precipitation_probability_max[i] : maxOf(hrs.map(x => x.pop)),
         gust: dl.wind_gusts_10m_max ? dl.wind_gusts_10m_max[i] : maxOf(hrs.map(x => x.gust)),
         windTop: maxOf(hrs.filter(x => x.hr >= 8 && x.hr <= 20).map(x => x.wind)),
@@ -450,15 +488,10 @@
         frostHrs: hrs.filter(x => x.frost && x.hr <= 9).length,
         ens: ensDay[date] || null, models: modelDay[date] || []
       };
-      dd.sky = sky(wakingMM, waking.filter(x => x.mm >= 0.2).length, dd.cloud, false);
+      dd.sky = sky(wakingMM, waking.filter(x => x.one >= 0.2).length, dd.cloud, false);
       dd.pRain = dd.ens ? dd.ens.wet / dd.ens.n : (dd.popMax != null ? dd.popMax / 100 : null);
-      // rain amount: with five or more models, drop the highest and the lowest and average the rest; with fewer, take the
-      // middle one. If the model comparison didn't load, fall back to the hourly feed's own total.
-      let est = dd.models.map(m => m.mm).filter(v => v != null).sort((a, b) => a - b);
-      if (est.length < 3) est = [mm].concat(est).filter(v => v != null).sort((a, b) => a - b);
-      const trimmed = est.length >= 5 ? est.slice(1, -1) : est;
-      dd.mmMid = !est.length ? mm : est.length >= 5 ? sum(trimmed) / trimmed.length : est.length % 2 ? est[(est.length - 1) / 2] : (est[est.length / 2 - 1] + est[est.length / 2]) / 2;
-      dd.mmLo = trimmed.length ? trimmed[0] : mm; dd.mmHi = trimmed.length ? trimmed[trimmed.length - 1] : mm;
+      const blend = dayBlend(dd.models, sum(hrs.map(x => x.one)));
+      dd.mmMid = blend.mid; dd.mmLo = blend.lo; dd.mmHi = blend.hi;
       dd.dryModels = dd.models.filter(m => m.mm != null && m.mm < 1).length;
       dd.dry = dd.mmMid < 0.2 && (dd.pRain == null || dd.pRain < 0.25);
       dd.fog = dd.fogHrs >= 2;
@@ -466,7 +499,7 @@
       return dd;
     });
     const ti = Math.max(0, days.findIndex(d => d.date === todayDate));
-    return { place: PLACE.key, H, days, ti, cur, nowN, nowIdx, todayDate, hasModels: !!(models && models.daily), hasEns: !!(ens && ens.hourly), hasMarine: !!(marine && marine.hourly) };
+    return { place: PLACE.key, H, days, ti, cur, nowN, nowIdx, todayDate, hourBlend, hasModels: !!(models && models.daily), hasEns: !!(ens && ens.hourly), hasMarine: !!(marine && marine.hourly) };
   }
 
   /* ---------- writing ---------- */
@@ -641,7 +674,7 @@
     if (!rows.length) return "";
     const mm = sum(rows.map(x => x.mm));
     const night = rows.filter(x => !x.isDay).length > rows.length / 2;
-    const s = sky(mm, rows.filter(x => x.mm >= 0.2).length, avg(rows.map(x => x.cloud)), night);
+    const s = sky(mm, rows.filter(x => x.one >= 0.2).length, avg(rows.map(x => x.cloud)), night);
     let skyTxt = s.word;
     if (rows.filter(x => x.fog).length >= 2) skyTxt += ", fog likely";
     if (rows.filter(x => x.frost).length >= 1) skyTxt += ", frost risk";
@@ -677,11 +710,12 @@
     const days = S.days.slice(S.ti, S.ti + 7);
     const head = '<thead><tr><th>Rain (mm)</th>' + days.map(d => '<th class="n">' + (d.i === S.ti ? "Today" : d.name.slice(0, 3)) + "</th>").join("") + "</tr></thead>";
     const f = v => v == null ? "–" : v.toFixed(1);
-    let body = '<tr><td>Hour-by-hour chart</td>' + days.map(d => '<td class="n">' + f(d.mm) + "</td>").join("") + "</tr>";
+    // at a racecourse the hourly charts already add up to the blend, so they don't get a row of their own
+    let body = S.hourBlend ? "" : '<tr><td>Hour-by-hour chart</td>' + days.map(d => '<td class="n">' + f(d.mm) + "</td>").join("") + "</tr>";
     MODELS.forEach(([key, label]) => {
       body += "<tr><td>" + label + "</td>" + days.map(d => { const m = d.models.find(x => x.key === key); return '<td class="n">' + f(m ? m.mm : null) + "</td>"; }).join("") + "</tr>";
     });
-    body += '<tr class="blend"><td>Blend used in the summary</td>' + days.map(d => '<td class="n">' + f(d.mmMid) + "</td>").join("") + "</tr>";
+    body += '<tr class="blend"><td>' + (S.hourBlend ? "Blend used on this page" : "Blend used in the summary") + "</td>" + days.map(d => '<td class="n">' + f(d.mmMid) + "</td>").join("") + "</tr>";
     if (S.hasEns) body += '<tr class="ens"><td>Ensemble runs with 1 mm or more</td>' + days.map(d => '<td class="n">' + (d.ens ? d.ens.wet + "/" + d.ens.n : "–") + "</td>").join("") + "</tr>";
     body += '<tr><th>High (°C)</th>' + days.map(() => "<th></th>").join("") + "</tr>";
     body += "<tr><td>Range across the models</td>" + days.map(d => {
@@ -709,7 +743,7 @@
     if (spreads.length) ps.push("Daily highs agree to within about " + Math.max(1, r0(spreads[Math.floor(spreads.length / 2)])) + "°C on most days.");
     if (!S.hasModels) ps.push("The model comparison didn't load this time. Refresh the page to try again.");
     $("agreeText").innerHTML = (ps.length ? "<p>" + esc(ps.join(" ")) + "</p>" : "") +
-      '<p class="small">The blend drops the highest and the lowest model and averages the rest. The line-up and the blend were chosen by scoring each model\'s past forecasts against the Hamilton and Auckland airport rain gauges from January 2024 to November 2026. The US model is left out from five days ahead, where its rain figures ran about half too low. Each model reports for its nearest grid point, so small differences are normal, and forecasts more than four or five days out can change from one update to the next.</p>';
+      '<p class="small">The blend drops the highest and the lowest model and averages the rest. The line-up and the blend were chosen by scoring each model\'s past forecasts against the Hamilton and Auckland airport rain gauges from January 2024 to November 2026. The US model is left out from five days ahead, where its rain figures ran about half too low.' + (S.hourBlend ? " The rain for each hour is the average across the models, scaled so a day\'s hours add up to its blend, which ran closer to the gauges\' six-hourly readings than any one model\'s hours." : "") + ' Each model reports for its nearest grid point, so small differences are normal, and forecasts more than four or five days out can change from one update to the next.</p>';
   }
 
   function renderPast() {
@@ -1424,7 +1458,7 @@
     });
     g += "</svg>";
     return '<div class="waterchart">' + g + "</div>" +
-      '<p class="small"><span class="key keyrain"></span>Rain, mm above the line. <span class="key keyevap"></span>Water lost to evaporation, mm below it. The week ahead uses the middle of the model estimates.</p>';
+      '<p class="small"><span class="key keyrain"></span>Rain, mm above the line. <span class="key keyevap"></span>Water lost to evaporation, mm below it. The week ahead uses the blend of the models.</p>';
   }
 
   function hideTip() { tip.hidden = true; if (geo) geo.cross.setAttribute("visibility", "hidden"); }

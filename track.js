@@ -26,6 +26,50 @@
   const hourRow = n => S.H.find(x => x.n === Math.floor(n));
   const hoursBetween = (a, b) => S.H.filter(x => x.n >= a && x.n < b);
   const thunder = x => x.code != null && x.code >= 95;
+  // The hourly rain here is an average across the models, which flattens a sharp burst. So bursts, and how many hours
+  // count as wet, are read from the hourly feed's own figure (the 9 km European model) where there is one.
+  const burst = x => Math.max(x.mm, x.one || 0);
+  const wetHour = x => (x.one != null ? x.one : x.mm) >= 0.2;
+
+  /* ---------- chance of rain ---------- */
+  // The chance of at least so many millimetres falling in a stretch of hours. It goes on two things: the share of the
+  // models whose total for the stretch reaches the mark, and how far the blended total sits from it. The weights were
+  // fitted to what fell at the Hamilton and Auckland airport gauges from February 2025 to November 2026, fitting on
+  // one gauge and checking on the other (backtest/chance.py). There is a set for part of a day, for about a day and
+  // for several days. Each is [constant, share of models, blend against the mark, days ahead / 6, ln(mark), and for
+  // part of a day the blend term squared].
+  const CHANCE = {
+    sub: [-1.6336, 1.1753, 1.4247, 0.114, 0.4221, -0.2172],
+    day: [-1.392, 0.7725, 1.7535, 0.0264, 0.3837, 0],
+    multi: [-1.3799, 0.8142, 2.1947, -0.0222, 0.3576, 0]
+  };
+  const MARKS = [1, 5, 10, 20];
+  function chances(a, b) {
+    const rows = hoursBetween(a, b);
+    if (rows.length < 3 || rows.some(x => !x.mods)) return null;
+    const tot = [];
+    rows[0].mods.forEach((v, j) => { if (rows.every(x => x.mods[j] != null)) tot.push(C.sum(rows.map(x => x.mods[j]))); });
+    if (tot.length < 3) return null;
+    const blend = C.sum(rows.map(x => x.mm));
+    const cls = rows.length < 15 ? "sub" : rows.length <= 36 ? "day" : "multi";
+    const lead = cls === "multi" ? Math.round(rows.length / 24) : Math.max(1, dayCount(S.todayDate, rows[rows.length - 1].date));
+    const w = CHANCE[cls];
+    return { blend, models: tot.length, p: MARKS.map(T => {
+      const f = tot.filter(v => v >= T).length / tot.length;
+      const r = Math.max(-3, Math.min(3, Math.log((blend + 0.5) / (T + 0.5))));
+      return 1 / (1 + Math.exp(-(w[0] + w[1] * f + w[2] * r + w[3] * lead / 6 + w[4] * Math.log(T) + w[5] * r * r)));
+    }) };
+  }
+  const CHANCE_NOTE = "The chances come from how many of the models reach each amount and how close the blended forecast is to it, set against 21 months of readings at the Hamilton and Auckland airport rain gauges. When this said 70%, that much rain fell about 7 times in 10.";
+  const pct = p => p < 0.05 ? "<5%" : p > 0.95 ? ">95%" : Math.round(p * 20) * 5 + "%";
+  // A table of chances for a list of stretches, each [label, from, to]. Empty if the models' hourly rain didn't load.
+  function chanceTable(list) {
+    const rows = list.map(([label, a, b]) => {
+      const c = chances(a, b);
+      return c ? '<tr><td class="part">' + C.esc(label) + '</td><td class="n">' + mmFig(c.blend) + "</td>" + c.p.map(p => '<td class="n">' + pct(p) + "</td>").join("") + "</tr>" : "";
+    }).join("");
+    return rows ? '<div class="tablewrap"><table class="chance"><thead><tr><th></th><th class="n">Forecast</th>' + MARKS.map(T => '<th class="n">' + T + " mm</th>").join("") + "</tr></thead><tbody>" + rows + "</tbody></table></div>" : "";
+  }
 
   // When a stretch of hours falls, as words: "from 3pm to 9pm" or "at 7pm".
   function span(rows) {
@@ -311,8 +355,16 @@
       return '<tr><td class="part">' + c.name + '</td><td class="n">' + tm + "</td><td" + (passed ? ' class="past"' : "") + ">" + (passed ? "Done" : C.esc(sk)) + "</td><td>" + C.esc(rainTxt) + "</td></tr>";
     }).join("");
     const raceMM = C.sum(race.map(x => x.mm));
-    const raceSky = race.some(thunder) ? "Thunder possible" : C.sky(raceMM, race.filter(x => x.mm >= 0.2).length, C.avg(race.map(x => x.cloud)), false).word;
+    const raceSky = race.some(thunder) ? "Thunder possible" : C.sky(raceMM, race.filter(wetHour).length, C.avg(race.map(x => x.cloud)), false).word;
     const racingRow = '<tr><td class="part">Racing</td><td class="n">' + C.fmtH(m.from) + "–" + C.fmtH(m.to) + "</td><td>" + C.esc(raceSky) + ", " + C.r0(C.maxOf(race.map(x => x.temp))) + "°</td><td>" + C.esc(mmFig(raceMM) + " during racing") + "</td></tr>";
+
+    // the chance of the rain reaching each amount, for the stretches that matter before and on the day
+    const stretches = [];
+    if (m.morning > S.nowN + 3) stretches.push(["Now to race morning", S.nowN, m.morning]);
+    if (m.date > S.todayDate) stretches.push(["Race day, all day", C.tnum(m.date + "T00:00"), C.tnum(m.date + "T00:00") + 24]);
+    if (m.start > S.nowN) stretches.push(["During racing", m.start, m.end]);
+    else if (m.end > S.nowN + 3) stretches.push(["Rest of racing", S.nowN, m.end]);
+    const ct = chanceTable(stretches);
 
     // last seven days, for the track information sheet
     const past = S.days.slice(Math.max(0, S.ti - 7), S.ti);
@@ -323,6 +375,7 @@
       '<p class="small">Racing hours are taken as ' + C.fmtH(m.from) + " to " + C.fmtH(m.to) + (m.timed ? ", from the club's listed first race and number of races" : "") + ', so check the times for the day. "In the straight" is the wind as the horses meet it running to the post, and inside and outside are the rails.</p></div>' +
       '<div class="col"><h3>Track checks</h3><div class="tablewrap"><table class="checks"><thead><tr><th></th><th class="n">When</th><th>Weather</th><th>Rain to the next check</th></tr></thead><tbody>' + crow + racingRow + "</tbody></table></div>" +
       '<p class="small">The 48 and 24 hour checks are timed from the start of racing.</p>' +
+      (ct ? "<h3>Chance of at least this much rain</h3>" + ct + '<p class="small">How the chances are worked out is under On the track, below.</p>' : "") +
       "<h3>The last seven days</h3><p>About " + C.esc(mmFig(pmm)) + " of rain and " + C.r0(pet) + " mm of evaporation, from the weather models. Check the rain against the course gauge before it goes on the track information sheet.</p></div>";
   }
 
@@ -400,10 +453,10 @@
       });
       out.push("Thunderstorms are possible " + C.listJoin(bits) + (dates.length > 4 ? ", and on other days later in the week" : "") + ".");
     }
-    const pours = nextH.filter(x => x.mm >= 5);
+    const pours = nextH.filter(x => burst(x) >= 5);
     if (pours.length) {
-      const top = pours.slice().sort((a, b) => b.mm - a.mm)[0];
-      out.push("The heaviest burst looks like about " + C.r0(top.mm) + " mm in an hour, at " + C.fmtH(top.hr) + " " + (dayWord(top.date) === "today" ? "today" : dayWord(top.date) === "tomorrow" ? "tomorrow" : "on " + dayWord(top.date)) + ".");
+      const top = pours.slice().sort((a, b) => burst(b) - burst(a))[0];
+      out.push("The heaviest burst looks like about " + C.r0(burst(top)) + " mm in an hour, at " + C.fmtH(top.hr) + " " + (dayWord(top.date) === "today" ? "today" : dayWord(top.date) === "tomorrow" ? "tomorrow" : "on " + dayWord(top.date)) + ".");
     } else if (!storms.length) {
       out.push("No thunderstorms or heavy downpours are forecast in the next seven days.");
     }
@@ -462,7 +515,9 @@
 
   function renderTrack() {
     $("trackRead").innerHTML = para(writeTrack());
-    $("trackWater").innerHTML = "<h3>Rain in, evaporation out</h3>" + C.waterChart(S);
+    const ct = chanceTable([["Next 24 hours", S.nowN, S.nowN + 24], ["Next 3 days", S.nowN, S.nowN + 72], ["Next 7 days", S.nowN, S.nowN + 168]]);
+    $("trackWater").innerHTML = "<h3>Rain in, evaporation out</h3>" + C.waterChart(S) +
+      (ct ? "<h3>Chance of at least this much rain</h3>" + ct + '<p class="small">' + CHANCE_NOTE + "</p>" : "");
     const soilTxt = writeSoil();
     $("trackSoil").innerHTML = "<h3>Soil moisture</h3>" + (soilTxt ? "<p>" + C.esc(soilTxt) + "</p>" : "") + soilChart() +
       '<p class="small"><span class="keyline"></span>Top 9 cm <span class="keyline dash" style="margin-left:10px"></span>9 to 27 cm, as a share of the soil\'s volume. This is the weather model\'s estimate for the area, not a reading from the track. ' + C.esc(P.soilNote || "") + "</p>" +
@@ -494,7 +549,7 @@
         el("rect", { x: cx + 1, y, width: cw - 2, height: RH, rx: 2.5, class: "cellbg" }, grp);
         if (!x.isDay) el("rect", { x: cx + 1, y, width: cw - 2, height: RH, rx: 2.5, class: "dark" }, grp);
         if (x.mm >= 0.2) el("rect", { x: cx + 1, y, width: cw - 2, height: RH, rx: 2.5, class: "scell", "fill-opacity": (x.mm >= 5 ? 0.92 : x.mm >= 3 ? 0.7 : x.mm >= 1 ? 0.45 : 0.2).toFixed(2) }, grp);
-        if (x.mm >= 5) el("rect", { x: cx + 1, y, width: cw - 2, height: RH, rx: 2.5, class: "pourbox" }, grp);
+        if (burst(x) >= 5) el("rect", { x: cx + 1, y, width: cw - 2, height: RH, rx: 2.5, class: "pourbox" }, grp);
         if (thunder(x)) el("circle", { cx: cx + cw / 2, cy: y + RH / 2, r: Math.min(3.4, cw / 4), class: "thring" }, grp);
         cells.push({ x: cx, y, w: cw, h: RH, d, row: x });
       }
@@ -519,6 +574,7 @@
       (x.gust != null ? line("Gusts", C.r0(x.gust) + " km/h") : "");
     if (thunder(x)) html += '<div class="flag">Thunderstorm possible</div>';
     if (x.mm >= 5) html += '<div class="flag">5 mm or more in the hour</div>';
+    else if (burst(x) >= 5) html += '<div class="flag">One model has a burst of ' + C.r0(burst(x)) + " mm in this hour</div>";
     showTip($("stormTip"), $("stormBox"), ev, html);
   }
 

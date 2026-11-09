@@ -86,7 +86,17 @@ That line-up came from a back-test in November 2026. Each model's past forecasts
 
 On the same days, the new blend's average miss on a day's rain, one to six days ahead, was about 6% lower than the old blend's at Hamilton (2.40 mm down to 2.26 mm) and about 4% lower at Auckland (2.53 mm down to 2.42 mm), from February 2025 on. At five and six days ahead it caught about half the days of 10 mm or more, up from about four in ten. The blend beat every single model at one to three days ahead.
 
-Limits: the airport gauges are about 13 km from Te Rapa and Ellerslie and 25 km from Pukekohe, the test covers daily totals only (not the timing of showers within a day), and the 51-run middle in the old blend couldn't be rebuilt from the archive. The scripts are in `backtest/`. `/api/pastruns` passes requests to the Previous Runs archive for the gauge sites, and with `live=1` returns the model comparison as the pages request it. Worth re-running once a year, or when a course has its own gauge record to score against.
+Limits: the airport gauges are about 13 km from Te Rapa and Ellerslie and 25 km from Pukekohe, this test covers daily totals (the next section covers six-hour totals), and the 51-run middle in the old blend couldn't be rebuilt from the archive. The scripts are in `backtest/`. `/api/pastruns` passes requests to the Previous Runs archive for the gauge sites, and with `live=1` returns the model comparison as the pages request it. Worth re-running once a year, or when a course has its own gauge record to score against.
+
+## Rain by the hour and the chance of rain at the racecourses
+
+On the racecourse tabs the rain for each hour, from today on, is the average of the six models for that hour, scaled so the day's hours add up to the day's blend. So the hourly charts, the totals before each track check and the daily figures all agree. The other tabs still take their hours from Open-Meteo's default feed (the European 9 km model).
+
+This came from a second back-test in November 2026 against the six-hour rain totals the same two airport gauges report. From October 2025, when the 9 km model's archive starts, the average miss on a six-hour total fell by 13 to 19% against the European model's hours on their own: at Hamilton from 0.86 mm to 0.75 mm at one to two days ahead and from 1.10 mm to 0.91 mm at five to six; at Auckland from 0.79 mm to 0.67 mm and from 1.01 mm to 0.86 mm. It caught about as many of the windows with 5 mm or more, with fewer false calls (at one to two days ahead, 36 to 37% of its 5 mm calls were wrong, down from 46 to 50%). It runs slightly dry, by about 0.1 mm per six hours.
+
+Averaging flattens a sharp burst, because the models rarely put it in the same hour. So the "5 mm or more in the hour" flags and the heaviest-burst line still read the European 9 km model's own hours, and so does the count of wet hours that decides between "showers" and "rain".
+
+The chance tables ("Chance of at least this much rain") give the chance of 1, 5, 10 and 20 mm falling in a stretch of hours. Each chance comes from two things: the share of the models whose total for the stretch reaches the amount, and how far the blended total is from it. The weights were fitted to what fell at the gauges from February 2025 to November 2026, with one set for part of a day, one for about a day and one for several days. Fitted on one gauge and checked on the other, the chances held up: for a day or several days, 50% came in at 44 to 53%, 70% at 64 to 75% and 88% at 85 to 89%. For part of a day, 70% came in at 64 to 69%, and the 10 and 20 mm figures there rest on few cases and ran a little high in the middle of the range. The weights are in `track.js` (`CHANCE`) and the fitting is in `backtest/chance.py`.
 
 ## Hosting
 

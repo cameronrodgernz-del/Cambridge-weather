@@ -274,6 +274,9 @@ body.finder .wrap > section:not(#findersec), body.finder .now { display: none !i
 .racehours td { white-space: nowrap; }
 .checks { min-width: 430px; }
 .checks td.n { white-space: nowrap; }
+.chance td.part { white-space: normal; }
+.chance td.n, .chance th.n { text-align: right; padding-right: 10px; }
+.chance td.n:last-child, .chance th.n:last-child { padding-right: 2px; }
 .racedetail tr.storm td:nth-child(2) { font-weight: 600; }
 #raceSeason { display: flex; flex-direction: column; gap: 12px; }
 #raceSeason td.n, #raceSeason th.n { text-align: right; padding-left: 12px; padding-right: 0; }
