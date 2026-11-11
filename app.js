@@ -68,6 +68,32 @@
       wetNote: "The greens have SubAir drainage, but the fairways may be soft.",
       feesText: "Summer 2026–27 visitor rates: $450 for 18 holes, $250 for 9 and $625 for all 27. Overseas visitors pay double. Online bookings add a 4% fee."
     },
+    // Adelaide trip, 13 to 15 November 2026. These run on Adelaide time: tz sets the clock the forecast comes back in,
+    // and every time on the page is read from that. "plan" is the day each tab is for (see renderPlan); its section
+    // hides itself once the day has passed.
+    adelaide: {
+      key: "adelaide", name: "Adelaide", title: "Adelaide Weather", region: "Adelaide, South Australia",
+      lat: -34.9285, lon: 138.6007, path: "/adelaide", tzNote: "Times are Adelaide time, 2½ hours behind New Zealand.", tz: "Australia/Adelaide",
+      forecast: "https://www.bom.gov.au/places/sa/adelaide/forecast", forecastName: "Bureau of Meteorology, Adelaide",
+      plan: { date: "2026-11-13", title: "Friday in the city", groups: 3, from: 6, to: 24 }
+    },
+    linksladybay: {
+      key: "linksladybay", name: "The Links Lady Bay", title: "Links Lady Bay Golf Weather", region: "Normanville, South Australia",
+      lat: -35.4623, lon: 138.3153, path: "/links-lady-bay", tzNote: "Times are Adelaide time, 2½ hours behind New Zealand.", golf: true, tz: "Australia/Adelaide",
+      forecast: "https://www.bom.gov.au/places/sa/normanville/forecast", forecastName: "Bureau of Meteorology, Normanville",
+      site: "https://www.linksladybay.com.au", siteLabel: "linksladybay.com.au", phone: "the pro shop on (08) 8558 0650",
+      bookHow: "book at",
+      drainNote: "The Links Lady Bay is a sand-based links, so it should drain quickly.",
+      wetNote: "Expect some soft areas, even on a sand-based links.",
+      plan: { date: "2026-11-14", title: "Saturday's round", golf: true }
+    },
+    adelaideoval: {
+      key: "adelaideoval", name: "Adelaide Oval", title: "Adelaide Oval Weather", region: "North Adelaide, South Australia",
+      lat: -34.9156, lon: 138.5962, path: "/adelaide-oval", tzNote: "Times are Adelaide time, 2½ hours behind New Zealand.", tz: "Australia/Adelaide",
+      forecast: "https://www.bom.gov.au/places/sa/adelaide/forecast", forecastName: "Bureau of Meteorology, Adelaide",
+      // Second ODI, Australia v England. Starts 2pm local; a 50-over day-night game runs to about 9:45pm.
+      plan: { date: "2026-11-15", title: "Sunday at the cricket", what: "Australia v England, second ODI", from: 14, to: 22, cricket: true }
+    },
     richhill: {
       key: "richhill", name: "Rich Hill Stud", title: "Rich Hill Stud Weather", region: "Walton, near Matamata",
       lat: -37.7440, lon: 175.7040, path: "/rich-hill", farm: true,
@@ -200,7 +226,7 @@
   /* ---------- requests ---------- */
   const qs = o => Object.entries(o).map(([k, v]) => k + "=" + encodeURIComponent(v)).join("&");
   function urlsFor(place) {
-  const common = { latitude: place.lat, longitude: place.lon, timezone: TIMEZONE };
+  const common = { latitude: place.lat, longitude: place.lon, timezone: place.tz || TIMEZONE };
   // the racecourse also needs soil readings and evaporation by the hour, and two weeks back to find the last decent rain
   const trackHourly = ",soil_temperature_6cm,soil_temperature_18cm,soil_moisture_0_to_1cm,soil_moisture_1_to_3cm,soil_moisture_3_to_9cm,soil_moisture_9_to_27cm,et0_fao_evapotranspiration";
   return {
@@ -313,6 +339,8 @@
   }
 
   /* Sky words. Day words for daylight hours, night words for the dark. */
+  // whether an hour counts as wet, from the hourly feed's own figure where there is one
+  const wetHour = x => (x.one != null ? x.one : x.mm) >= 0.2;
   function sky(mm, wetHrs, cloud, night) {
     if (mm >= 25) return { word: "Heavy rain", prose: "heavy rain", icon: "rain", wet: true };
     if (mm >= 8) return wetHrs >= 8 ? { word: "Rain", prose: "rain", icon: "rain", wet: true } : { word: "Heavy showers", prose: "heavy showers", icon: "rain", wet: true };
@@ -532,7 +560,7 @@
     if (hrNow < 17) {
       const rest = S.H.filter(x => x.n >= S.nowN - 0.5 && x.date === today.date && x.hr <= 19);
       const restMM = sum(rest.map(x => x.mm));
-      const s = sky(restMM, rest.filter(x => x.mm >= 0.2).length, avg(rest.map(x => x.cloud)), false);
+      const s = sky(restMM, rest.filter(wetHour).length, avg(rest.map(x => x.cloud)), false);
       const restHi = maxOf(rest.map(x => x.temp));
       let line = cap(s.prose) + " for the rest of today";
       if (restHi != null && restHi > S.cur.temperature_2m + 0.5) line += ", with a high of " + r0(restHi) + "°C";
@@ -699,6 +727,107 @@
     const pop = maxOf(rows.map(x => x.pop));
     const rain = mm < 0.2 ? (pop != null && pop >= 20 ? "Possible shower, " + pop + "%" : "Dry") : mmText(mm) + (pop != null ? ", " + pop + "%" : "");
     return '<tr><td class="part">' + label + "</td><td>" + esc(skyTxt) + '</td><td class="n">' + temp + "</td><td>" + esc(wind) + "</td><td>" + esc(rain) + "</td></tr>";
+  }
+
+  /* ---------- a planned day (the Adelaide tabs) ---------- */
+  // PLACE.plan: { date, title, what, from, to } with from/to as clock hours; groups: 3 sets the table in three-hour
+  // blocks; golf: true runs it from first light to sunset with a golf rating each hour; cricket: true adds the
+  // start, the evening and the lights.
+  const NUMW = ["no", "one", "two", "three", "four", "five", "six", "seven"];
+  const clockTo = h => h % 24 === 0 ? "midnight" : fmtH(h % 24);
+  function planRow(rows, label, golfCol) {
+    let mm = sum(rows.map(x => x.mm));
+    // the blended hours spread a passing shower thinly, so a trace that fewer than half the models have reads as a
+    // possible shower rather than as rain
+    let share = null;
+    if (rows[0].mods) {
+      const tot = rows[0].mods.map((v, j) => rows.every(x => x.mods && x.mods[j] != null) ? sum(rows.map(x => x.mods[j])) : null).filter(v => v != null);
+      if (tot.length >= 3) share = tot.filter(v => v >= 0.2).length / tot.length;
+    }
+    const trace = mm >= 0.2 && mm < 1 && share != null && share < 0.5;
+    const night = rows.filter(x => !x.isDay).length > rows.length / 2;
+    const s = sky(trace ? 0 : mm, rows.filter(wetHour).length, avg(rows.map(x => x.cloud)), night);
+    const tMin = r0(minOf(rows.map(x => x.temp))), tMax = r0(maxOf(rows.map(x => x.temp)));
+    const fMin = r0(minOf(rows.map(x => x.feels != null ? x.feels : x.temp)));
+    const temp = (tMin === tMax ? tMax + "°" : tMin + "–" + tMax + "°") + (fMin <= tMin - 2 ? ", feels " + fMin + "°" : "");
+    const wMin = r0(minOf(rows.map(x => x.wind))), wMax = r0(maxOf(rows.map(x => x.wind))), g = r0(maxOf(rows.map(x => x.gust)));
+    const wind = (wMax < 6 ? "Light" : dir16(meanDir(rows)) + " " + (wMin === wMax ? wMax : wMin + "–" + wMax)) + (g >= 30 ? ", gusts " + g : "");
+    const pop = maxOf(rows.map(x => x.pop));
+    const rain = trace ? "Shower possible" + (pop != null && pop >= 20 ? ", " + pop + "%" : "")
+      : mm < 0.2 ? (pop != null && pop >= 20 ? "Possible shower, " + pop + "%" : "Dry") : mmText(mm) + (pop != null ? ", " + pop + "%" : "");
+    const golf = golfCol ? '<td>' + (rows[0].play ? cap(playWord(rows[0].play.s)) : "–") + "</td>" : "";
+    return '<tr><td class="part">' + label + "</td><td>" + esc(s.word) + '</td><td class="n">' + temp + "</td><td>" + esc(wind) + "</td><td>" + esc(rain) + "</td>" + golf + "</tr>";
+  }
+  // How many of the models have 1 mm or more over a run of hours, and how many have the hours at all.
+  function modelsWet(rows) {
+    if (!rows.length || !rows[0].mods) return null;
+    let n = 0, wet = 0;
+    rows[0].mods.forEach((v, j) => {
+      if (!rows.every(x => x.mods && x.mods[j] != null)) return;
+      n++;
+      if (sum(rows.map(x => x.mods[j])) >= 1) wet++;
+    });
+    return n >= 3 ? { n, wet } : null;
+  }
+  function renderPlan() {
+    const P = PLACE.plan, sec = $("plansec");
+    const d = P && S.days.find(x => x.date === P.date);
+    if (!sec || !P || !d || P.date < S.todayDate) { if (sec) sec.hidden = true; return; }
+    sec.hidden = false;
+    const dayWord = d.i === S.ti ? "Today" : d.i === S.ti + 1 ? "Tomorrow" : d.name;
+    let from = P.from, to = P.to;
+    if (P.golf && d.sunrise && d.sunset) { from = +d.sunrise.slice(11, 13) + 1; to = +d.sunset.slice(11, 13); }
+    const rows = d.hrs.filter(x => x.hr >= from && x.hr < to);
+    if (!rows.length) { sec.hidden = true; return; }
+    $("h-plan").textContent = P.title;
+    $("planSub").textContent = (P.what ? P.what + ", " : "") + d.name + " " + dnum(d.date) + " " + mon(d.date) +
+      (P.cricket ? ", from " + fmtH(P.from) : "") + "." + (PLACE.tzNote ? " " + PLACE.tzNote : "");
+
+    const out = [];
+    const mm = sum(rows.map(x => x.mm));
+    const s = sky(mm, rows.filter(wetHour).length, avg(rows.map(x => x.cloud)), false);
+    const first = rows[0], last = rows[rows.length - 1];
+    const tMax = r0(maxOf(rows.map(x => x.temp)));
+    const feelsOf = x => r0(x.feels != null ? x.feels : x.temp);
+    if (P.cricket) {
+      out.push("Play starts at " + fmtH(P.from) + " in " + r0(first.temp) + "°C" + (r0(first.temp) < tMax ? ", peaking at " + tMax + "°C" : "") +
+        ", and it's down to " + r0(last.temp) + "°C by " + clockTo(last.hr + 1) + (feelsOf(last) <= r0(last.temp) - 2 ? ", feeling like " + feelsOf(last) + "°C" : "") + ".");
+    } else if (P.golf) {
+      const best = bestWindow(d, 4, d.i === S.ti ? Math.ceil(S.nowN - 0.25) : null);
+      if (best && best.v >= 45) out.push("The best time to tee off is around " + fmtH(best.start.hr) + ", which looks " + playWord(best.v) + ": " + windowCond(best) + ".");
+      else if (best) {
+        const why = topReasons(best.hrs);
+        out.push(dayWord + " isn't a good day for golf" + (why.length ? ", with " + listJoin(why) + " the main problem" + (why.length > 1 ? "s" : "") : "") + ".");
+      }
+    } else {
+      out.push(dayWord + " looks " + s.prose + ", with a high of " + tMax + "°C, cooling to " + r0(last.temp) + "°C by " + clockTo(last.hr + 1) + ".");
+    }
+    // rain, counted model by model so a shower one model has doesn't read as a wet day
+    const span = P.cricket ? "during play" : P.golf ? "between first light and sunset" : "between " + fmtH(from) + " and " + clockTo(to);
+    const mw = modelsWet(rows), pop = maxOf(rows.map(x => x.pop)) || 0;
+    const peak = rows.slice().sort((a, b) => b.mm - a.mm)[0];
+    if (mw && mw.wet === 0) out.push("None of the " + NUMW[mw.n] + " models has 1 mm or more " + span + (pop >= 30 ? ", though the chance of a shower reaches " + pop + "%" : "") + ".");
+    else if (mw) out.push((mw.wet === mw.n ? "All " + NUMW[mw.n] : cap(NUMW[mw.wet]) + " of the " + NUMW[mw.n]) + " model" + (mw.wet === 1 && mw.wet !== mw.n ? " has" : "s have") + " 1 mm or more " + span +
+      ", and the blend is " + mmText(mm) + (mm >= 1 ? ", most of it around " + fmtH(peak.hr) : "") + ".");
+    else if (mm >= 0.2) out.push("Expect " + mmText(mm) + " of rain " + span + ".");
+    else out.push("It looks dry " + span + ".");
+    const wMax = r0(maxOf(rows.map(x => x.wind))), wMin = r0(minOf(rows.map(x => x.wind))), g = r0(maxOf(rows.map(x => x.gust)));
+    const dl = dirLong(meanDir(rows));
+    out.push(wMax < 10 ? "Winds stay light." : "Winds are " + (dl ? dl + " " : "") + (wMin === wMax ? wMax : wMin + "–" + wMax) + " km/h" + (g >= 35 ? ", gusting to " + g : "") + ".");
+    if (P.cricket && d.sunset) out.push("Sunset is at " + fmtClock(d.sunset) + ", so most of the second innings is under lights.");
+    if (d.uvFrom != null && d.uvTo > from) out.push("Sunscreen is needed until about " + fmtH(d.uvTo % 24) + " (UV peaks at " + r0(d.uvMax) + ", " + uvWord(d.uvMax) + ").");
+
+    const step = P.groups || 1, groups = [];
+    for (let h = from; h < to; h += step) {
+      const g2 = rows.filter(x => x.hr >= h && x.hr < h + step);
+      if (g2.length) groups.push([g2, step > 1 ? fmtH(h) + "–" + clockTo(h + step) : fmtH(h)]);
+    }
+    const golfCol = !!P.golf;
+    $("planRead").innerHTML = '<p class="lead">' + esc(out[0]) + "</p><p>" + esc(out.slice(1).join(" ")) + "</p>";
+    $("planHours").innerHTML = '<div class="tablewrap"><table class="plantable"><thead><tr><th></th><th>Sky</th><th class="n">Temp</th><th>Wind (km/h)</th><th>Rain</th>' +
+      (golfCol ? "<th>Golf</th>" : "") + "</tr></thead><tbody>" + groups.map(([g2, l]) => planRow(g2, l, golfCol)).join("") + "</tbody></table></div>" +
+      '<p class="small">Rain is the blend of six models; the percentage is the highest chance of rain in that ' + (step > 1 ? "block" : "hour") + "." +
+      (d.i - S.ti >= 3 ? " This is " + (d.i - S.ti) + " days out, so it can still shift." : "") + "</p>";
   }
 
   function renderDay() {
@@ -997,7 +1126,7 @@
     if (f > 28) { s -= (f - 28) * 4; why.push("heat"); }
     if (x.fog) { s -= 30; why.push("fog"); }
     if (x.frost) { s -= 40; why.push("frost on the greens"); }
-    return { s: Math.max(0, Math.min(100, Math.round(s))), why };
+    return { s: Math.max(0, Math.min(100, Math.round(s))), why, rain };
   }
   const playWord = v => v >= 80 ? "great" : v >= 65 ? "good" : v >= 45 ? "fair" : "poor";
 
@@ -1142,8 +1271,9 @@
         el("rect", { x: cx + 1, y, width: cw - 2, height: RH, rx: 3, class: "cell", "fill-opacity": (0.08 + 0.87 * Math.pow(x.play.s / 100, 2)).toFixed(2) }, g);
         if (x.fog) el("rect", { x: cx + 1, y, width: cw - 2, height: RH, rx: 3, class: "fog" }, g);
         if (x.frost) el("rect", { x: cx + 1, y, width: cw - 2, height: RH, rx: 3, class: "frost" }, g);
-        if (x.mm >= 0.2) el("circle", { cx: cx + cw / 2, cy: y + RH / 2 - 3, r: 3.4, class: "rdot" }, g);
-        else if ((x.pop || 0) >= 50) el("circle", { cx: cx + cw / 2, cy: y + RH / 2 - 3, r: 3, class: "rring" }, g);
+        // a dot when about half the models have 1 mm or more in the hour, a ring when a shower is on the cards
+        if (x.play.rain >= 33) el("circle", { cx: cx + cw / 2, cy: y + RH / 2 - 3, r: 3.4, class: "rdot" }, g);
+        else if (x.play.rain >= 20 || (x.pop || 0) >= 50) el("circle", { cx: cx + cw / 2, cy: y + RH / 2 - 3, r: 3, class: "rring" }, g);
         if ((x.gust || 0) >= 35) el("line", { x1: cx + 5, x2: cx + cw - 5, y1: y + RH - 6, y2: y + RH - 6, class: "gbar" }, g);
         cells.push({ x: cx, y, w: cw, h: RH, d, row: x });
       }
@@ -1534,8 +1664,8 @@
   function applyPlaceChrome() {
     $("placeName").innerHTML = esc(PLACE.name).replace(/T(ī)/g, 'T<span class="tk">$1</span>');
     $("region").textContent = PLACE.region;
-    $("msLink").href = PLACE.metservice;
-    $("msLink").textContent = "MetService, " + PLACE.metserviceName;
+    $("msLink").href = PLACE.forecast || PLACE.metservice;
+    $("msLink").textContent = PLACE.forecastName || "MetService, " + PLACE.metserviceName;
     document.title = PLACE.title;
     $("chart").setAttribute("aria-label", "Hourly temperature, chance of rain, wind and cloud for " + PLACE.name);
     $("golfsec").hidden = !PLACE.golf;
@@ -1560,6 +1690,7 @@
     if (selected == null || selected < S.ti || selected > S.ti + 6) selected = S.ti;
     renderNow();
     renderRead();
+    renderPlan();
     if (PLACE.golf) renderGolf();
     if (PLACE.beach) renderBeach();
     if (PLACE.farm) renderFarm();

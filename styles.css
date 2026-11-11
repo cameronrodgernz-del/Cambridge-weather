@@ -425,3 +425,7 @@ footer { display: flex; flex-direction: column; gap: 10px; font-size: 13px; colo
 footer ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
 
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+
+/* planned day (Adelaide tabs) */
+.planhours { margin-top: 14px; }
+.plantable td.part { white-space: nowrap; }

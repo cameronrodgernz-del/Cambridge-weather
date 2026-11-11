@@ -102,6 +102,10 @@ Both changes were checked at two more gauges in November 2026, Tauranga Airport 
 
 The chance tables ("Chance of at least this much rain") give the chance of 1, 5, 10 and 20 mm falling in a stretch of hours. Each chance comes from two things: the share of the models whose total for the stretch reaches the amount, and how far the blended total is from it. The weights were fitted to what fell at the gauges from February 2025 to November 2026, with one set for part of a day, one for about a day and one for several days. Fitted on one gauge and checked on the other, the chances held up: for a day or several days, 50% came in at 44 to 53%, 70% at 64 to 75% and 88% at 85 to 89%. For part of a day, 70% came in at 64 to 69%, and the 10 and 20 mm figures there rest on few cases and ran a little high in the middle of the range. The weights are in `track.js` (`CHANCE`) and the fitting is in `backtest/chance.py`.
 
+## Adelaide trip tabs
+
+Adelaide, The Links Lady Bay (Normanville) and Adelaide Oval, for 13 to 15 November 2026. These places carry `tz: "Australia/Adelaide"`, so the forecast comes back on Adelaide time and every time on the page follows it. Each has a `plan`, the day it's for, which adds a section under the summary: a short read and an hour-by-hour table for that window (Friday in three-hour blocks, Saturday's round from first light to sunset with a golf rating each hour, Sunday's ODI from 2pm to about 10pm). Rain in that section counts how many of the six models have 1 mm or more, and a trace that fewer than half the models have shows as "Shower possible". The section hides itself once the day has passed. The forecast link goes to the Bureau of Meteorology instead of MetService.
+
 ## Hosting
 
 It's a plain static site: `index.html`, `styles.css`, `app.js`, with `finder.js` for the tee times tab and `track.js` for the racecourse. No build step and no keys. On Vercel, import the GitHub repository and deploy with the default settings (Framework preset: Other).

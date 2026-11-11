@@ -40,6 +40,18 @@
     {
       "source": "/pukekohe",
       "destination": "/"
+    },
+    {
+      "source": "/adelaide",
+      "destination": "/"
+    },
+    {
+      "source": "/links-lady-bay",
+      "destination": "/"
+    },
+    {
+      "source": "/adelaide-oval",
+      "destination": "/"
     }
   ],
   "headers": [
